@@ -1,0 +1,16 @@
+{
+  "name": "grexya-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Servidor MCP para que Claude controle la base de datos de Grexya.",
+  "scripts": {
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "@supabase/supabase-js": "^2.108.1",
+    "tsx": "^4.19.2",
+    "zod": "^3.23.8"
+  }
+}

@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Grexya.app
 
-## Getting Started
+**Tu base central para construir y orquestar todos tus proyectos.** El "Notion propio" para builders: cada proyecto con su contexto, pipeline, tareas, equipo y notas — y un **Centro de mando** que fusiona las tareas de *todos* tus proyectos en una sola vista (lo que Notion cobra).
 
-First, run the development server:
+> Público objetivo: builders / business-tech que crean ideas y proyectos a diario.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Stack
+
+- **Next.js 16** (App Router, TypeScript) — deploy gratis en Vercel
+- **Tailwind v4** + componentes propios estilo Notion (light/dark con `next-themes`)
+- **Clerk** — autenticación / identidad (login gestionado, Organizations para equipo)
+- **Supabase** — Postgres + RLS + Realtime + Storage (datos; desde la Fase 1)
+- **dnd-kit** — tableros Kanban arrastrables
+- **Anthropic API** — chat con agentes propios (Forge/Aura/grexya…) desde la Fase 2
+
+## Puesta en marcha
+
+1. **Instala dependencias** (ya hecho si clonaste con `node_modules`):
+   ```bash
+   npm install
+   ```
+
+2. **Crea las cuentas y copia las claves** a `.env.local` (parte de `.env.local.example`):
+   ```bash
+   cp .env.local.example .env.local
+   ```
+   - **Clerk** → https://dashboard.clerk.com → crea una app → copia `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` y `CLERK_SECRET_KEY`. Habilita Google y/o email.
+   - **Supabase** (desde Fase 1) → https://supabase.com → crea un proyecto → copia URL y `anon key`. Conéctalo a Clerk en *Authentication → Third-Party Auth → Clerk*.
+
+3. **Arranca:**
+   ```bash
+   npm run dev
+   ```
+   Abre http://localhost:3000 → te redirige a `/sign-in` (Clerk) → tras entrar, `/mando`.
+
+## Estructura
+
+```
+app/
+  (auth)/          # sign-in y sign-up (Clerk)
+  (app)/
+    mando/         # Centro de mando: todas las tareas de todos los proyectos
+    proyectos/[slug]/   # proyecto: Kanban | Lista | Notas | Chat IA
+components/         # sidebar, theme, marca, ui
+lib/
+  supabase/        # clientes server/cliente (Clerk + Supabase)
+  placeholder-data.ts
+supabase/          # migraciones + seed (Fase 1)
+mcp/               # grexya-mcp para que Claude controle la DB (Fase 1.5)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Roadmap
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Fase 0 — Scaffold** ✅ marca, temas light/dark, Clerk, shell con sidebar y Centro de mando.
+- **Fase 1 — Núcleo** Supabase + modelo de datos + CRUD proyectos/tareas + Kanban/Lista + Centro de mando real + seed.
+- **Fase 1.5 — grexya-mcp** Claude controla la DB desde la terminal + notas.
+- **Fase 2 — Chat IA** agentes propios dentro de cada proyecto.
+- **Fase 3 — Equipo** invitaciones (Clerk Organizations), roles, realtime, pipeline E0→E6.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Tipos de proyecto
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Además del proyecto "venture" (Quepa, Wenú…), Grexya soportará un **proyecto tipo Diario/Empleo** con vista de planificación diaria: tareas por día, matriz de Eisenhower (urgente/importante), **Top 3 del día** y **subtareas**. Ver el plan maestro.
