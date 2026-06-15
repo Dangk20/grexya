@@ -1,6 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+  closestCorners,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Icon } from "@/components/grexya/icon";
 import { Avatar, Check, PriorityChip, SubCounter } from "@/components/grexya/atoms";
 import { PlanningModal } from "@/components/grexya/planning-modal";
@@ -156,14 +167,40 @@ function DailyTask({
   onToggle: (id: string) => void;
   onStar: () => void;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const isDone = task.is_done;
   return (
-    <div className={`dtask ${isDone ? "done" : ""}`} onClick={() => onOpen(task.id)}>
+    <div
+      ref={setNodeRef}
+      className={`dtask ${isDone ? "done" : ""}`}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        cursor: "grab",
+        ...(isDragging ? { position: "relative", zIndex: 2, background: "var(--hover)" } : {}),
+      }}
+      onClick={() => onOpen(task.id)}
+      {...attributes}
+      {...listeners}
+    >
       <Check done={isDone} onClick={() => onToggle(task.id)} size={17} />
       <span className="dtask-title">{task.title}</span>
       <SubCounter task={task} all={all} />
       <StarBtn on={topOn} onClick={onStar} />
       <Avatar id={task.assignee_id} size={22} />
+    </div>
+  );
+}
+
+/** Contenedor droppable de un cuadrante (acepta drops aunque esté vacío). */
+function QuadTasks({ qid, ids, children }: { qid: Quad; ids: string[]; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: qid });
+  return (
+    <div ref={setNodeRef} className="quad-tasks" style={isOver ? { background: "var(--hover)", borderRadius: 10 } : undefined}>
+      <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+        {children}
+      </SortableContext>
     </div>
   );
 }
@@ -279,6 +316,42 @@ export function DailyBoard({
     if (res && !res.ok && res.error) setTopMsg(res.error);
   };
 
+  // Drag & drop entre cuadrantes: reordena y, si cambia de cuadrante, cambia la prioridad.
+  const cardSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const onCardDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over) return;
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    if (activeId === overId) return;
+    const dragged = board.find((t) => t.id === activeId);
+    if (!dragged) return;
+
+    let targetQuad: Quad;
+    let overTask: Task | undefined;
+    if ((QUAD_ORDER as string[]).includes(overId)) {
+      targetQuad = overId as Quad;
+    } else {
+      overTask = board.find((t) => t.id === overId);
+      if (!overTask) return;
+      targetQuad = quadOf(overTask);
+    }
+    const sourceQuad = quadOf(dragged);
+    const targetList = board.filter((t) => quadOf(t) === targetQuad && t.id !== activeId);
+    let idx = targetList.length;
+    if (overTask) {
+      const i = targetList.findIndex((t) => t.id === overTask!.id);
+      idx = i < 0 ? targetList.length : i;
+    }
+    const newList = [...targetList.slice(0, idx), dragged, ...targetList.slice(idx)];
+    const items = newList.map((t, i) => ({
+      id: t.id,
+      position: i,
+      ...(t.id === activeId && sourceQuad !== targetQuad ? { eisenhower: targetQuad } : {}),
+    }));
+    h.onReorderTasks(project.id, items);
+  };
+
   return (
     <div className="daily-board">
       <div className="daily-top">
@@ -365,6 +438,7 @@ export function DailyBoard({
         )}
       </div>
 
+      <DndContext sensors={cardSensors} collisionDetection={closestCorners} onDragEnd={onCardDragEnd}>
       <div className="daily-matrix">
         {QUAD_ORDER.map((qid) => {
           const q = QUAD_META[qid];
@@ -383,7 +457,7 @@ export function DailyBoard({
                 </div>
                 <span className="quad-count mono">{list.length}</span>
               </div>
-              <div className="quad-tasks">
+              <QuadTasks qid={qid} ids={list.map((t) => t.id)}>
                 {list.map((t) => (
                   <DailyTask
                     key={t.id}
@@ -401,7 +475,7 @@ export function DailyBoard({
                     h.onCreateTask({ projectId: project.id, title, start_date: dayISO, eisenhower: qid })
                   }
                 />
-              </div>
+              </QuadTasks>
             </div>
           );
         })}
@@ -523,6 +597,7 @@ export function DailyBoard({
           </div>
         </div>
       </div>
+      </DndContext>
 
       {meetFormOpen && (
         <NewMeetingModal

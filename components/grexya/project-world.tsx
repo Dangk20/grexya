@@ -1,6 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Icon } from "@/components/grexya/icon";
 import {
   Avatar,
@@ -41,6 +56,7 @@ export type WorldHandlers = {
   }) => void;
   onUpdateTask: (id: string, patch: Record<string, unknown>) => void;
   onSetTop3: (taskId: string, dayDate: string, on: boolean) => Promise<{ ok: boolean; error?: string }>;
+  onReorderTasks: (projectId: string, items: { id: string; position: number; eisenhower?: NonNullable<Task["eisenhower"]> }[]) => void;
   onDeleteTask: (id: string) => void;
   onDeleteTasks: (ids: string[]) => void;
   onOpenSettings: () => void;
@@ -293,14 +309,102 @@ function Kanban({
   );
 }
 
-type SortKey = "prio" | "due" | "status" | "name" | "recent";
+type SortKey = "manual" | "prio" | "due" | "status" | "name" | "recent";
 const SORT_OPTS: { id: SortKey; label: string }[] = [
+  { id: "manual", label: "Manual (arrastrar)" },
   { id: "prio", label: "Prioridad" },
   { id: "due", label: "Plazo" },
   { id: "status", label: "Estado" },
   { id: "name", label: "Nombre (A–Z)" },
   { id: "recent", label: "Más recientes" },
 ];
+
+function ListRow({
+  task,
+  all,
+  status,
+  selMode,
+  sel,
+  draggable,
+  onOpen,
+  onToggle,
+  onSel,
+  onDelete,
+}: {
+  task: Task;
+  all: Task[];
+  status: ProjectStatusColumn | null;
+  selMode: boolean;
+  sel: boolean;
+  draggable: boolean;
+  onOpen: (id: string) => void;
+  onToggle: (id: string) => void;
+  onSel: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id,
+    disabled: !draggable,
+  });
+  const done = task.is_done;
+  return (
+    <div
+      ref={setNodeRef}
+      className={`trow tbl-row ${done ? "done" : ""} ${sel ? "selected" : ""}`}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        cursor: draggable ? "grab" : "pointer",
+        ...(isDragging ? { background: "var(--hover)", position: "relative", zIndex: 2 } : {}),
+      }}
+      onClick={() => (selMode ? onSel(task.id) : onOpen(task.id))}
+      {...(draggable ? { ...attributes, ...listeners } : {})}
+    >
+      {selMode ? (
+        <span
+          className={`row-sel ${sel ? "on" : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSel(task.id);
+          }}
+        >
+          {sel && <Icon name="check" size={12} strokeWidth={3} />}
+        </span>
+      ) : (
+        <Check done={done} onClick={() => onToggle(task.id)} />
+      )}
+      <span className="tcell-task">
+        <span className="ttitle">{task.title}</span>
+        <SubCounter task={task} all={all} />
+      </span>
+      <span>
+        <StatusChip status={status} />
+      </span>
+      <span>
+        <DueLabel dueDate={task.due_date} />
+      </span>
+      <span>
+        <PriorityChip quad={task.eisenhower} />
+      </span>
+      <span style={{ display: "flex", justifyContent: "center" }}>
+        <Avatar id={task.assignee_id} size={26} />
+      </span>
+      {!selMode && (
+        <button
+          className="row-del"
+          title="Eliminar tarea"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (confirm(`¿Eliminar la tarea "${task.title}"?`)) onDelete(task.id);
+          }}
+        >
+          <Icon name="trash" size={15} />
+        </button>
+      )}
+    </div>
+  );
+}
 
 function ProjectList({
   projectId,
@@ -317,8 +421,9 @@ function ProjectList({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
-  const [sort, setSort] = useState<SortKey>("prio");
+  const [sort, setSort] = useState<SortKey>("manual");
   const [sortOpen, setSortOpen] = useState(false);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const submitNew = () => {
     const t = newTitle.trim();
     if (t) h.onCreateTask({ projectId, title: t, statusId: statuses[0]?.id ?? null });
@@ -335,6 +440,8 @@ function ProjectList({
       const bd = b.is_done ? 1 : 0;
       if (ad !== bd) return ad - bd;
       switch (sort) {
+        case "manual":
+          return (a.position ?? 0) - (b.position ?? 0);
         case "prio":
           return QUAD_RANK[quadOf(a)] - QUAD_RANK[quadOf(b)];
         case "due":
@@ -369,6 +476,16 @@ function ProjectList({
       h.onDeleteTasks([...selected]);
       exitSel();
     }
+  };
+  const onRowDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const ids = rows.map((r) => r.id);
+    const next = arrayMove(ids, ids.indexOf(String(active.id)), ids.indexOf(String(over.id)));
+    h.onReorderTasks(
+      projectId,
+      next.map((id, i) => ({ id, position: i })),
+    );
   };
 
   return (
@@ -461,60 +578,25 @@ function ProjectList({
           <span style={{ textAlign: "center" }}>Resp.</span>
           <span />
         </div>
-        {rows.map((t) => {
-          const done = t.is_done;
-          const sel = selected.has(t.id);
-          const st = t.status_id ? statusById.get(t.status_id) ?? null : null;
-          return (
-            <div
-              key={t.id}
-              className={`trow tbl-row ${done ? "done" : ""} ${sel ? "selected" : ""}`}
-              onClick={() => (selMode ? toggleSel(t.id) : h.onOpenTask(t.id))}
-            >
-              {selMode ? (
-                <span
-                  className={`row-sel ${sel ? "on" : ""}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleSel(t.id);
-                  }}
-                >
-                  {sel && <Icon name="check" size={12} strokeWidth={3} />}
-                </span>
-              ) : (
-                <Check done={done} onClick={() => h.onToggleTask(t.id)} />
-              )}
-              <span className="tcell-task">
-                <span className="ttitle">{t.title}</span>
-                <SubCounter task={t} all={tasks} />
-              </span>
-              <span>
-                <StatusChip status={st} />
-              </span>
-              <span>
-                <DueLabel dueDate={t.due_date} />
-              </span>
-              <span>
-                <PriorityChip quad={t.eisenhower} />
-              </span>
-              <span style={{ display: "flex", justifyContent: "center" }}>
-                <Avatar id={t.assignee_id} size={26} />
-              </span>
-              {!selMode && (
-                <button
-                  className="row-del"
-                  title="Eliminar tarea"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (confirm(`¿Eliminar la tarea "${t.title}"?`)) h.onDeleteTask(t.id);
-                  }}
-                >
-                  <Icon name="trash" size={15} />
-                </button>
-              )}
-            </div>
-          );
-        })}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onRowDragEnd}>
+          <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
+            {rows.map((t) => (
+              <ListRow
+                key={t.id}
+                task={t}
+                all={tasks}
+                status={t.status_id ? statusById.get(t.status_id) ?? null : null}
+                selMode={selMode}
+                sel={selected.has(t.id)}
+                draggable={sort === "manual" && !selMode}
+                onOpen={h.onOpenTask}
+                onToggle={h.onToggleTask}
+                onSel={toggleSel}
+                onDelete={h.onDeleteTask}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
         {rows.length === 0 && !adding && (
           <div className="tbl-empty">Sin tareas todavía.</div>
         )}

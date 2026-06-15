@@ -147,6 +147,16 @@ export function AppShell({
     await taskActions.createSubtask({ parentTaskId: parentId, title });
     refresh();
   };
+  const reorderTasks: WorldHandlers["onReorderTasks"] = async (projectId, items) => {
+    setTasks((ts) =>
+      ts.map((t) => {
+        const u = items.find((x) => x.id === t.id);
+        return u ? { ...t, position: u.position, ...(u.eisenhower ? { eisenhower: u.eisenhower } : {}) } : t;
+      }),
+    );
+    await taskActions.reorderTasks({ projectId, items });
+    refresh();
+  };
   const reorderSubtasks = async (parentId: string, ids: string[]) => {
     setTasks((ts) => ts.map((t) => {
       const i = ids.indexOf(t.id);
@@ -248,6 +258,7 @@ export function AppShell({
     onCreateTask: createTask,
     onUpdateTask: updateTask,
     onSetTop3: setTop3,
+    onReorderTasks: reorderTasks,
     onDeleteTask: deleteTask,
     onDeleteTasks: deleteTasks,
     onOpenSettings: () => setSettingsOpen(true),

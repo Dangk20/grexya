@@ -198,6 +198,31 @@ export async function updateTask(input: {
   revalidate();
 }
 
+/** Reordena tareas top-level (posición) y opcionalmente mueve de cuadrante (eisenhower). */
+export async function reorderTasks(input: {
+  projectId: string;
+  items: { id: string; position: number; eisenhower?: Eisenhower }[];
+}) {
+  const userId = await requireUser();
+  const ws = await getOrCreateWorkspace(userId);
+  const supabase = createAdminSupabaseClient();
+  const { data: proj } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("id", input.projectId)
+    .eq("workspace_id", ws.id)
+    .maybeSingle();
+  if (!proj) throw new Error("Proyecto no encontrado");
+  await Promise.all(
+    input.items.map((it) => {
+      const patch: Record<string, unknown> = { position: it.position };
+      if (it.eisenhower) patch.eisenhower = it.eisenhower;
+      return supabase.from("tasks").update(patch).eq("id", it.id).eq("project_id", input.projectId);
+    }),
+  );
+  revalidate();
+}
+
 export async function createSubtask(input: {
   parentTaskId: string;
   title: string;
