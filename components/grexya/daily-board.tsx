@@ -15,6 +15,32 @@ function hm(iso: string | null) {
   return new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Vista previa unificada de una reunión (de Google o del sistema). */
+type MeetPreview = {
+  title: string;
+  whenText: string;
+  location: string | null;
+  description: string | null;
+  attendees: string[];
+  hangoutLink: string | null;
+  htmlLink: string | null;
+  done: boolean;
+  sourceLabel: string;
+  onToggleDone: () => void;
+  onOpenTask?: () => void;
+};
+
+/** Texto de horario para una reunión de Google. */
+function meetingWhen(m: Meeting): string {
+  if (m.allDay) return "Todo el día";
+  const s = m.start ? new Date(m.start) : null;
+  const e = m.end ? new Date(m.end) : null;
+  const t = (d: Date) => d.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+  const date = s ? s.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" }) : "";
+  const range = s ? `${t(s)}${e ? ` – ${t(e)}` : ""}` : "";
+  return `${date}${date && range ? " · " : ""}${range}`;
+}
+
 const QUAD_ORDER: Quad[] = ["ui", "ni", "un", "nn"];
 const DP_MONTHS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DP_WD = ["L", "M", "X", "J", "V", "S", "D"];
@@ -182,6 +208,7 @@ export function DailyBoard({
   const [gmeetings, setGmeetings] = useState<Meeting[]>([]);
   const [meetFormOpen, setMeetFormOpen] = useState(false);
   const [planningOpen, setPlanningOpen] = useState(false);
+  const [preview, setPreview] = useState<MeetPreview | null>(null);
   const autoRef = useRef<string | null>(null);
   const d = new Date();
   d.setDate(d.getDate() + offset);
@@ -393,8 +420,21 @@ export function DailyBoard({
                   <span className="meet-time mono">{m.allDay ? "Día" : hm(m.start)}</span>
                   <span
                     className="meet-title"
-                    style={{ cursor: m.htmlLink ? "pointer" : "default" }}
-                    onClick={() => m.htmlLink && window.open(m.htmlLink, "_blank")}
+                    style={{ cursor: "pointer" }}
+                    onClick={() =>
+                      setPreview({
+                        title: m.title,
+                        whenText: meetingWhen(m),
+                        location: m.location,
+                        description: m.description,
+                        attendees: m.attendees,
+                        hangoutLink: m.hangoutLink,
+                        htmlLink: m.htmlLink,
+                        done: m.done,
+                        sourceLabel: "Google Calendar",
+                        onToggleDone: () => toggleGMeeting(m),
+                      })
+                    }
                   >
                     {m.title}
                   </span>
@@ -419,7 +459,24 @@ export function DailyBoard({
                 <span
                   className="meet-title"
                   style={{ cursor: "pointer" }}
-                  onClick={() => h.onOpenTask(t.id)}
+                  onClick={() =>
+                    setPreview({
+                      title: t.title,
+                      whenText: t.meeting_time || "Sin hora",
+                      location: null,
+                      description: t.description,
+                      attendees: [],
+                      hangoutLink: null,
+                      htmlLink: null,
+                      done: t.is_done,
+                      sourceLabel: "Reunión del proyecto",
+                      onToggleDone: () => h.onToggleTask(t.id),
+                      onOpenTask: () => {
+                        setPreview(null);
+                        h.onOpenTask(t.id);
+                      },
+                    })
+                  }
                 >
                   {t.title}
                 </span>
@@ -486,6 +543,111 @@ export function DailyBoard({
           onClose={() => setPlanningOpen(false)}
         />
       )}
+
+      {preview && (
+        <MeetingModal data={preview} accent={project.accent ?? "#5B5BD6"} onClose={() => setPreview(null)} />
+      )}
+    </div>
+  );
+}
+
+function MeetingModal({
+  data,
+  accent,
+  onClose,
+}: {
+  data: MeetPreview;
+  accent: string;
+  onClose: () => void;
+}) {
+  const [done, setDone] = useState(data.done);
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const toggle = () => {
+    setDone((d) => !d);
+    data.onToggleDone();
+  };
+
+  return (
+    <div className="modal-wrap" style={{ ["--accent" as string]: accent }}>
+      <div className="modal-scrim" onClick={onClose} />
+      <div className="modal" style={{ maxWidth: 460 }}>
+        <div className="modal-head">
+          <span className="section-label">Reunión · {data.sourceLabel}</span>
+          <button className="icon-btn sm" onClick={onClose}>
+            <Icon name="x" size={17} />
+          </button>
+        </div>
+
+        <h2 style={{ fontSize: 19, fontWeight: 700, margin: "2px 0 14px", lineHeight: 1.3 }}>{data.title}</h2>
+
+        <div className="mt-detail">
+          <div className="mt-row">
+            <Icon name="clock" size={15} className="faint" />
+            <span style={{ textTransform: "capitalize" }}>{data.whenText}</span>
+          </div>
+          {data.location && (
+            <div className="mt-row">
+              <Icon name="target" size={15} className="faint" />
+              <span>{data.location}</span>
+            </div>
+          )}
+          {data.attendees.length > 0 && (
+            <div className="mt-row" style={{ alignItems: "flex-start" }}>
+              <Icon name="users" size={15} className="faint" />
+              <div className="mt-att">
+                {data.attendees.map((a) => (
+                  <span key={a} className="mt-chip">
+                    {a}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {data.description ? (
+          <div className="so-sec" style={{ marginTop: 14 }}>
+            <span className="section-label">Descripción</span>
+            <p style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--text-2)", whiteSpace: "pre-wrap", marginTop: 8 }}>
+              {data.description}
+            </p>
+          </div>
+        ) : null}
+
+        <div className="modal-foot" style={{ justifyContent: "space-between", marginTop: 20 }}>
+          <button className="btn btn-ghost" onClick={toggle}>
+            <Icon name="check" size={15} />
+            {done ? "Marcar pendiente" : "Marcar como hecha"}
+          </button>
+          <div style={{ display: "flex", gap: 10 }}>
+            {data.onOpenTask && (
+              <button className="btn btn-line" onClick={data.onOpenTask}>
+                <Icon name="pencil" size={15} />
+                Abrir tarea
+              </button>
+            )}
+            {data.hangoutLink && (
+              <a className="btn btn-line" href={data.hangoutLink} target="_blank" rel="noreferrer" style={{ color: "#2FA363" }}>
+                <Icon name="users" size={15} />
+                Unirse a Meet
+              </a>
+            )}
+            {data.htmlLink && (
+              <a className="btn btn-accent" href={data.htmlLink} target="_blank" rel="noreferrer">
+                <Icon name="calendar" size={15} />
+                Abrir en Calendar
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

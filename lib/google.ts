@@ -17,6 +17,8 @@ export type Meeting = {
   start: string | null; // ISO o fecha
   end: string | null;
   allDay: boolean;
+  description: string | null;
+  location: string | null;
   hangoutLink: string | null;
   htmlLink: string | null;
   attendees: string[];
@@ -98,6 +100,8 @@ export async function listProjectMeetings(
       start: e.start?.dateTime ?? e.start?.date ?? null,
       end: e.end?.dateTime ?? e.end?.date ?? null,
       allDay: !e.start?.dateTime,
+      description: e.description ?? null,
+      location: e.location ?? null,
       hangoutLink: e.hangoutLink ?? null,
       htmlLink: e.htmlLink ?? null,
       attendees: (e.attendees ?? []).map((a) => a.email ?? "").filter(Boolean),

@@ -371,6 +371,10 @@ input,textarea{font-family:inherit}
 .meet-item:hover{background:var(--hover)}
 .meet-item.done{opacity:.6}
 .meet-item.done .meet-title{color:var(--text-3);text-decoration:line-through}
+.mt-detail{display:flex;flex-direction:column;gap:9px}
+.mt-row{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--text-2)}
+.mt-att{display:flex;flex-wrap:wrap;gap:6px}
+.mt-chip{font-size:12px;color:var(--text-2);background:var(--field);border-radius:20px;padding:3px 10px}
 .meet-time{font-size:12px;font-weight:700;color:color-mix(in oklab,var(--c) 60%,var(--text));background:color-mix(in oklab,var(--c) 13%,transparent);padding:3px 7px;border-radius:6px;flex-shrink:0}
 .meet-title{flex:1;font-size:13.5px;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .notes{display:grid;grid-template-columns:262px 1fr;gap:18px;align-items:start}
