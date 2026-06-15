@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/grexya/icon";
 import { Check, PriorityChip } from "@/components/grexya/atoms";
-import { isMeeting, localISO, QUAD_META, type Quad } from "@/lib/grexya-helpers";
+import { isMeeting, isScheduledForDay, localISO, QUAD_META, type Quad } from "@/lib/grexya-helpers";
 import { getMeetings } from "@/app/actions/calendar";
 import { submitPlanning, skipPlanning, type PlanItem } from "@/app/actions/planning";
 import type { Meeting } from "@/lib/google";
@@ -53,6 +53,7 @@ export function PlanningModal({
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [input, setInput] = useState("");
   const [retroOpen, setRetroOpen] = useState(true);
+  const [planOpen, setPlanOpen] = useState(true);
   const [gRetro, setGRetro] = useState<Meeting[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -83,6 +84,16 @@ export function PlanningModal({
       meetings: sameDay.filter((t) => isMeeting(t)),
     };
   }, [tasks, dayISO]);
+
+  // ---- Plan de hoy: lo que ya está agendado para dayISO (tareas + reuniones) ----
+  const plan = useMemo(() => {
+    const all = tasks.filter((t) => !t.parent_task_id && isScheduledForDay(t, dayISO));
+    return {
+      tasks: all.filter((t) => !isMeeting(t)).sort((a, b) => Number(a.is_done) - Number(b.is_done)),
+      meetings: all.filter((t) => isMeeting(t)),
+    };
+  }, [tasks, dayISO]);
+  const planCount = plan.tasks.length + plan.meetings.length;
 
   useEffect(() => {
     if (!calendarConn.connected || !retro.day) return;
@@ -240,6 +251,36 @@ export function PlanningModal({
             </div>
           )}
         </div>
+
+        {/* ---- Plan de hoy: lo que ya diligenciaste ---- */}
+        {planCount > 0 && (
+          <div className="plan-retro">
+            <button className="plan-retro-head" onClick={() => setPlanOpen((o) => !o)}>
+              <Icon name={planOpen ? "chevDown" : "chevRight"} size={16} />
+              <span>Plan de {fmtDay(dayISO).toLowerCase()}</span>
+              <span className="plan-retro-count mono">{planCount}</span>
+            </button>
+            {planOpen && (
+              <div className="plan-retro-body">
+                {plan.tasks.map((t) => (
+                  <div key={t.id} className="retro-row">
+                    <Check done={t.is_done} size={16} />
+                    <PriorityChip quad={t.eisenhower} />
+                    <span className={`retro-title ${t.is_done ? "retro-sub-done" : ""}`}>{t.title}</span>
+                  </div>
+                ))}
+                {plan.meetings.length > 0 && <div className="retro-sec-label">Reuniones</div>}
+                {plan.meetings.map((t) => (
+                  <div key={t.id} className="retro-row">
+                    <Check done={t.is_done} size={16} />
+                    <span className="retro-time mono">{t.meeting_time || "—"}</span>
+                    <span className={`retro-title ${t.is_done ? "retro-sub-done" : ""}`}>{t.title}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ---- ¿Qué harás hoy? ---- */}
         <div className="plan-today">

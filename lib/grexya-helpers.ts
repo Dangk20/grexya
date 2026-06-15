@@ -48,12 +48,13 @@ export function isMeeting(t: Task) {
 }
 
 /**
- * ¿La tarea está programada para `dayISO` (YYYY-MM-DD)? Modelo ventana inicio→plazo:
- * - Con inicio y plazo: aparece cada día entre ambos (inclusive).
+ * ¿La tarea está programada para `dayISO` (YYYY-MM-DD)?
+ * - Con inicio y plazo: aparece cada día entre ambos (ventana, inclusive).
  * - Solo plazo (sin inicio): aparece únicamente el día del plazo.
- * - Solo inicio (sin plazo): aparece desde el inicio en adelante.
+ * - Solo inicio (sin plazo): aparece únicamente el día de inicio (es su "día objetivo").
  * - Sin fechas: aparece en "hoy".
- * - Vencida y sin terminar: se arrastra a "hoy" para que no desaparezca.
+ * - Atrasada y sin terminar: se arrastra a "hoy" para que no se pierda.
+ * - Top 3 de este día: siempre visible.
  */
 export function isScheduledForDay(t: Task, dayISO: string, today: string = todayISO()): boolean {
   const start = t.start_date;
@@ -63,14 +64,14 @@ export function isScheduledForDay(t: Task, dayISO: string, today: string = today
   if (t.is_top3 && t.day_date === dayISO) return true;
   // Sin programar → siempre hoy
   if (!start && !due) return isToday;
-  // Vencida sin terminar → se arrastra a hoy
-  if (due && due < today && !t.is_done && isToday) return true;
-  // Solo plazo (sin inicio): únicamente el día del plazo
-  if (!start && due) return dayISO === due;
-  // Con inicio (con o sin plazo): ventana
-  const afterStart = !start || dayISO >= start;
-  const beforeDue = !due || dayISO <= due;
-  return afterStart && beforeDue;
+  // Día objetivo: el plazo si existe; si no, el inicio
+  const targetDay = due ?? start;
+  // Atrasada/vencida sin terminar → se arrastra a hoy (no a todos los días futuros)
+  if (targetDay && targetDay < today && !t.is_done && isToday) return true;
+  // Con inicio Y plazo → ventana completa
+  if (start && due) return dayISO >= start && dayISO <= due;
+  // Solo uno de los dos (inicio o plazo) → ese día específico
+  return dayISO === targetDay;
 }
 
 export type Quad = "ui" | "ni" | "un" | "nn";
