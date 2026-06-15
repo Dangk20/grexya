@@ -75,12 +75,28 @@ function SortableSub({
   sub,
   onToggle,
   onDelete,
+  onRename,
 }: {
   sub: Task;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
+  onRename: (id: string, title: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sub.id });
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(sub.title);
+
+  const startEdit = () => {
+    setVal(sub.title);
+    setEditing(true);
+  };
+  const commit = () => {
+    const t = val.trim();
+    setEditing(false);
+    if (t && t !== sub.title) onRename(sub.id, t);
+    else setVal(sub.title);
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -101,9 +117,46 @@ function SortableSub({
         <Icon name="grip" size={15} />
       </span>
       <Check done={sub.is_done} onClick={() => onToggle(sub.id)} size={18} />
-      <span className={sub.is_done ? "sub-done" : ""} style={{ flex: 1 }}>
-        {sub.title}
-      </span>
+      {editing ? (
+        <textarea
+          autoFocus
+          rows={1}
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              commit();
+            }
+            if (e.key === "Escape") {
+              setVal(sub.title);
+              setEditing(false);
+            }
+          }}
+          style={{
+            flex: 1,
+            background: "var(--field)",
+            border: "none",
+            borderRadius: 6,
+            padding: "4px 7px",
+            outline: "none",
+            resize: "none",
+            color: "var(--text)",
+            font: "inherit",
+            lineHeight: 1.4,
+          }}
+        />
+      ) : (
+        <span
+          className={sub.is_done ? "sub-done" : ""}
+          style={{ flex: 1, cursor: "text" }}
+          onClick={startEdit}
+          title="Click para editar"
+        >
+          {sub.title}
+        </span>
+      )}
       <button className="icon-btn sm" onClick={() => onDelete(sub.id)} title="Eliminar subtarea">
         <Icon name="x" size={14} />
       </button>
@@ -347,7 +400,13 @@ export function DetailPanel({
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onSubDragEnd}>
                 <SortableContext items={order} strategy={verticalListSortingStrategy}>
                   {orderedSubs.map((s) => (
-                    <SortableSub key={s.id} sub={s} onToggle={onToggle} onDelete={onDeleteTask} />
+                    <SortableSub
+                      key={s.id}
+                      sub={s}
+                      onToggle={onToggle}
+                      onDelete={onDeleteTask}
+                      onRename={(id, title) => onUpdate(id, { title })}
+                    />
                   ))}
                 </SortableContext>
               </DndContext>
