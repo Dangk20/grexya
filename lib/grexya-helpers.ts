@@ -43,14 +43,6 @@ export function subStats(task: Task, all: Task[]) {
   return { total, done, ratio: total ? done / total : task.is_done ? 1 : 0 };
 }
 
-/** Tipo derivado: muchas tareas abiertas hoy ⇒ operación diaria. */
-export function deriveType(tasks: Task[]): "venture" | "diario" {
-  const todayOpen = tasks.filter(
-    (t) => !t.parent_task_id && dueOffset(t.due_date) === 0 && !t.is_done,
-  ).length;
-  return todayOpen >= 4 ? "diario" : "venture";
-}
-
 export function isMeeting(t: Task) {
   return t.eisenhower === "reunion";
 }

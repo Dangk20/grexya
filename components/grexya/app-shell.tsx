@@ -24,7 +24,7 @@ import {
 import { createNote, deleteNote, updateNote } from "@/app/actions/notes";
 import { disconnectCalendar } from "@/app/actions/calendar";
 import type { CalendarConn } from "@/lib/data";
-import type { ModuleId, Note, Project, ProjectStatusColumn, Task } from "@/lib/types";
+import type { ModuleId, Note, Planning, Project, ProjectStatusColumn, Task } from "@/lib/types";
 
 export function AppShell({
   projects: pProjects,
@@ -32,6 +32,7 @@ export function AppShell({
   notes: pNotes,
   statuses: pStatuses,
   calendars: pCalendars,
+  plannings: pPlannings,
   me,
 }: {
   projects: Project[];
@@ -39,6 +40,7 @@ export function AppShell({
   notes: Note[];
   statuses: ProjectStatusColumn[];
   calendars: CalendarConn[];
+  plannings: Planning[];
   me: Person;
 }) {
   const router = useRouter();
@@ -50,6 +52,7 @@ export function AppShell({
   const [notes] = useSyncedState<Note[]>(pNotes);
   const [statuses, setStatuses] = useSyncedState<ProjectStatusColumn[]>(pStatuses);
   const [calendars] = useSyncedState<CalendarConn[]>(pCalendars);
+  const [plannings] = useSyncedState<Planning[]>(pPlannings);
 
   const [route, setRoute] = useState<"command" | "project">("command");
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -280,6 +283,7 @@ export function AppShell({
               notes={notes.filter((n) => n.project_id === activeProject.id)}
               statuses={statuses.filter((s) => s.project_id === activeProject.id)}
               calendarConn={calConn(activeProject.id)}
+              plannings={plannings.filter((p) => p.project_id === activeProject.id)}
               module={activeModule}
               h={worldHandlers}
             />

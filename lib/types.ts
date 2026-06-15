@@ -78,6 +78,14 @@ export type TaskWithProject = Task & {
   project: Pick<Project, "id" | "name" | "slug" | "emoji" | "color">;
 };
 
+export type PlanningStatus = "planned" | "skipped";
+
+export type Planning = {
+  project_id: string;
+  day_date: string;
+  status: PlanningStatus;
+};
+
 export type Note = {
   id: string;
   project_id: string;

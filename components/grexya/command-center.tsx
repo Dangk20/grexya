@@ -23,7 +23,7 @@ import {
   QUAD_RANK,
   todayISO,
 } from "@/lib/grexya-helpers";
-import { getTodayMeetingsAll } from "@/app/actions/calendar";
+import { getTodayMeetingsAll, toggleMeetingDone } from "@/app/actions/calendar";
 import type { Meeting } from "@/lib/google";
 import type { Project, Task } from "@/lib/types";
 
@@ -262,11 +262,13 @@ function MeetingsPanel({
   projectById,
   connectedProjectIds,
   onOpenTask,
+  onToggleTask,
 }: {
   tasks: Task[];
   projectById: Map<string, Project>;
   connectedProjectIds: string[];
   onOpenTask: (id: string) => void;
+  onToggleTask: (id: string) => void;
 }) {
   const [gmeetings, setGmeetings] = useState<(Meeting & { projectId: string })[]>([]);
   const connectedKey = connectedProjectIds.join(",");
@@ -281,6 +283,12 @@ function MeetingsPanel({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectedKey]);
+
+  const toggleGMeeting = async (m: Meeting & { projectId: string }) => {
+    const next = !m.done;
+    setGmeetings((ms) => ms.map((x) => (x.id === m.id ? { ...x, done: next } : x)));
+    await toggleMeetingDone(m.projectId, m.id, next).catch(() => {});
+  };
 
   const meetings = tasks
     .filter((t) => !t.parent_task_id && isMeeting(t) && dueOffset(t.due_date) === 0)
@@ -300,14 +308,18 @@ function MeetingsPanel({
         {gmeetings.map((m) => {
           const p = projectById.get(m.projectId);
           return (
-            <button
+            <div
               key={m.id}
-              className="meet-row"
-              onClick={() => m.htmlLink && window.open(m.htmlLink, "_blank")}
+              className={`meet-row ${m.done ? "done" : ""}`}
               style={{ ["--accent" as string]: p?.accent ?? "#5B5BD6" }}
             >
+              <Check done={m.done} onClick={() => toggleGMeeting(m)} size={17} />
               <span className="meet-row-time mono">{m.allDay ? "Día" : hm(m.start)}</span>
-              <span className="meet-row-body">
+              <span
+                className="meet-row-body"
+                style={{ cursor: m.htmlLink ? "pointer" : "default" }}
+                onClick={() => m.htmlLink && window.open(m.htmlLink, "_blank")}
+              >
                 <span className="meet-row-title">{m.title}</span>
                 <span className="meet-row-meta">{p && <ProjectChip project={p} />}</span>
               </span>
@@ -325,25 +337,29 @@ function MeetingsPanel({
               ) : (
                 <Icon name="calendar" size={15} className="faint" />
               )}
-            </button>
+            </div>
           );
         })}
         {meetings.map((t) => {
           const p = projectById.get(t.project_id);
           return (
-            <button
+            <div
               key={t.id}
-              className="meet-row"
-              onClick={() => onOpenTask(t.id)}
+              className={`meet-row ${t.is_done ? "done" : ""}`}
               style={{ ["--accent" as string]: p?.accent ?? "#5B5BD6" }}
             >
+              <Check done={t.is_done} onClick={() => onToggleTask(t.id)} size={17} />
               <span className="meet-row-time mono">{t.meeting_time || "—"}</span>
-              <span className="meet-row-body">
+              <span
+                className="meet-row-body"
+                style={{ cursor: "pointer" }}
+                onClick={() => onOpenTask(t.id)}
+              >
                 <span className="meet-row-title">{t.title}</span>
                 <span className="meet-row-meta">{p && <ProjectChip project={p} />}</span>
               </span>
               <Avatar id={t.assignee_id} size={24} />
-            </button>
+            </div>
           );
         })}
         {total === 0 && (
@@ -431,6 +447,7 @@ export function CommandCenter({
           projectById={projectById}
           connectedProjectIds={connectedProjectIds}
           onOpenTask={onOpenTask}
+          onToggleTask={onToggleTask}
         />
       </div>
     </div>

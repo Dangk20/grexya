@@ -17,7 +17,7 @@ import { DailyBoard } from "@/components/grexya/daily-board";
 import { NotesView } from "@/components/grexya/notes-view";
 import { ProjectIcon } from "@/components/grexya/project-icon";
 import { coverFor, deriveType, projectProgress, subStats } from "@/lib/grexya-helpers";
-import type { ModuleId, Note, Project, ProjectStatusColumn, Task } from "@/lib/types";
+import type { ModuleId, Note, Planning, Project, ProjectStatusColumn, Task } from "@/lib/types";
 
 export const COLOR_HEX: Record<string, string> = {
   gray: "#8A8A84", blue: "#3E63DD", green: "#2FA363", amber: "#E08E1B",
@@ -509,6 +509,7 @@ export function ProjectWorld({
   notes,
   statuses,
   calendarConn,
+  plannings,
   module: mod,
   h,
 }: {
@@ -517,6 +518,7 @@ export function ProjectWorld({
   notes: Note[];
   statuses: ProjectStatusColumn[];
   calendarConn: { connected: boolean; email: string | null };
+  plannings: Planning[];
   module: ModuleId;
   h: WorldHandlers;
 }) {
@@ -582,7 +584,7 @@ export function ProjectWorld({
 
       <div className="world-body">
         {mod === "hoy" && (
-          <DailyBoard project={project} tasks={tasks} calendarConn={calendarConn} h={h} />
+          <DailyBoard project={project} tasks={tasks} calendarConn={calendarConn} plannings={plannings} h={h} />
         )}
         {mod === "kanban" && <Kanban project={project} tasks={tasks} statuses={statuses} h={h} />}
         {mod === "lista" && (

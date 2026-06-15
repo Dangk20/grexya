@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/grexya/icon";
 import { Avatar, Check, PriorityChip, SubCounter } from "@/components/grexya/atoms";
-import { isMeeting, isScheduledForDay, localISO, quadOf, QUAD_META, type Quad } from "@/lib/grexya-helpers";
+import { PlanningModal } from "@/components/grexya/planning-modal";
+import { isMeeting, isScheduledForDay, localISO, quadOf, QUAD_META, todayISO, type Quad } from "@/lib/grexya-helpers";
 import { getMeetings, createMeeting, toggleMeetingDone } from "@/app/actions/calendar";
 import type { Meeting } from "@/lib/google";
-import type { Project, Task } from "@/lib/types";
+import type { Planning, Project, Task } from "@/lib/types";
 import type { WorldHandlers } from "@/components/grexya/project-world";
 
 function hm(iso: string | null) {
@@ -166,11 +167,13 @@ export function DailyBoard({
   project,
   tasks,
   calendarConn,
+  plannings,
   h,
 }: {
   project: Project;
   tasks: Task[];
   calendarConn: { connected: boolean; email: string | null };
+  plannings: Planning[];
   h: WorldHandlers;
 }) {
   const [offset, setOffset] = useState(0);
@@ -178,12 +181,31 @@ export function DailyBoard({
   const [topMsg, setTopMsg] = useState<string | null>(null);
   const [gmeetings, setGmeetings] = useState<Meeting[]>([]);
   const [meetFormOpen, setMeetFormOpen] = useState(false);
+  const [planningOpen, setPlanningOpen] = useState(false);
+  const autoRef = useRef<string | null>(null);
   const d = new Date();
   d.setDate(d.getDate() + offset);
   let dlabel = d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
   dlabel = dlabel.charAt(0).toUpperCase() + dlabel.slice(1);
   const pill = offset === 0 ? "Hoy" : offset === 1 ? "Mañana" : offset === -1 ? "Ayer" : "";
   const dayISO = localISO(d);
+
+  // Planning time: ¿hay algo planeado para este día? ¿ya se planeó/saltó?
+  const dayTaskCount = tasks.filter(
+    (t) => !t.parent_task_id && !isMeeting(t) && isScheduledForDay(t, dayISO),
+  ).length;
+  const dayPlanned = plannings.some((p) => p.day_date === dayISO);
+  const canPlan = dayTaskCount === 0;
+
+  // Hoy + sin tareas + sin registro de planeación → abre el modal una vez
+  useEffect(() => {
+    if (autoRef.current === dayISO) return;
+    if (dayISO === todayISO() && dayTaskCount === 0 && !dayPlanned) {
+      autoRef.current = dayISO;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPlanningOpen(true);
+    }
+  }, [dayISO, dayTaskCount, dayPlanned]);
 
   const refetchMeetings = () => {
     if (calendarConn.connected) getMeetings(project.id, dayISO).then(setGmeetings).catch(() => {});
@@ -200,15 +222,16 @@ export function DailyBoard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarConn.connected, project.id, dayISO]);
 
-  // Tareas del día seleccionado (ventana inicio→plazo); las completadas salen del tablero.
-  const open = tasks.filter(
-    (t) => !t.parent_task_id && !t.is_done && isScheduledForDay(t, dayISO),
+  // Tareas del día seleccionado (ventana inicio→plazo). Las completadas permanecen
+  // visibles (tachadas) para ver lo realizado del día, no se excluyen del tablero.
+  const dayTasks = tasks.filter(
+    (t) => !t.parent_task_id && isScheduledForDay(t, dayISO),
   );
   // Reuniones de Grexya del día: incluye las ya hechas (con check), para verlas tachadas.
-  const meetings = tasks
-    .filter((t) => !t.parent_task_id && isMeeting(t) && isScheduledForDay(t, dayISO))
+  const meetings = dayTasks
+    .filter(isMeeting)
     .sort((a, b) => (a.meeting_time ?? "").localeCompare(b.meeting_time ?? ""));
-  const board = open.filter((t) => !isMeeting(t));
+  const board = dayTasks.filter((t) => !isMeeting(t));
 
   // Top 3 = etiqueta explícita, del día seleccionado
   const isTopForDay = (t: Task) => t.is_top3 && t.day_date === dayISO;
@@ -258,6 +281,12 @@ export function DailyBoard({
           <button className="icon-btn btn-line" style={{ width: 32 }} onClick={() => setOffset((o) => o + 1)}>
             <Icon name="chevRight" size={17} />
           </button>
+          {canPlan && (
+            <button className="btn btn-accent plan-cta" onClick={() => setPlanningOpen(true)}>
+              <Icon name="target" size={15} />
+              Iniciar planning time
+            </button>
+          )}
         </div>
       </div>
 
@@ -306,7 +335,9 @@ export function DailyBoard({
       <div className="daily-matrix">
         {QUAD_ORDER.map((qid) => {
           const q = QUAD_META[qid];
-          const list = board.filter((t) => quadOf(t) === qid);
+          const list = board
+            .filter((t) => quadOf(t) === qid)
+            .sort((a, b) => Number(a.is_done) - Number(b.is_done));
           return (
             <div key={qid} className={`quad tone-${q.tone}`} style={{ gridArea: qid }}>
               <div className="quad-head">
@@ -443,6 +474,16 @@ export function DailyBoard({
             }
             return res;
           }}
+        />
+      )}
+
+      {planningOpen && (
+        <PlanningModal
+          project={project}
+          tasks={tasks}
+          calendarConn={calendarConn}
+          dayISO={dayISO}
+          onClose={() => setPlanningOpen(false)}
         />
       )}
     </div>

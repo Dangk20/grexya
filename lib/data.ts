@@ -3,6 +3,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type {
   AgentThread,
   Note,
+  Planning,
   Project,
   ProjectStatusColumn,
   Task,
@@ -254,6 +255,7 @@ export async function getAppData(userId: string): Promise<{
   notes: Note[];
   statuses: ProjectStatusColumn[];
   calendars: CalendarConn[];
+  plannings: Planning[];
 }> {
   const ws = await getOrCreateWorkspace(userId);
   const supabase = db();
@@ -265,9 +267,9 @@ export async function getAppData(userId: string): Promise<{
     .order("position", { ascending: true });
   const ids = (projects ?? []).map((p) => p.id);
   if (ids.length === 0) {
-    return { projects: (projects ?? []) as Project[], tasks: [], notes: [], statuses: [], calendars: [] };
+    return { projects: (projects ?? []) as Project[], tasks: [], notes: [], statuses: [], calendars: [], plannings: [] };
   }
-  const [tasksRes, notesRes, statusesRes, calsRes] = await Promise.all([
+  const [tasksRes, notesRes, statusesRes, calsRes, planRes] = await Promise.all([
     supabase
       .from("tasks")
       .select("*")
@@ -284,6 +286,7 @@ export async function getAppData(userId: string): Promise<{
       .in("project_id", ids)
       .order("position", { ascending: true }),
     supabase.from("project_calendars").select("project_id, email").in("project_id", ids),
+    supabase.from("project_plannings").select("project_id, day_date, status").in("project_id", ids),
   ]);
   return {
     projects: (projects ?? []) as Project[],
@@ -291,6 +294,7 @@ export async function getAppData(userId: string): Promise<{
     notes: (notesRes.data ?? []) as Note[],
     statuses: (statusesRes.data ?? []) as ProjectStatusColumn[],
     calendars: (calsRes.data ?? []) as CalendarConn[],
+    plannings: (planRes.data ?? []) as Planning[],
   };
 }
 

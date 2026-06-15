@@ -28,7 +28,6 @@ function Switcher({
 }: {
   inProject: boolean;
   activeProject: Project | null;
-  activeType: "venture" | "diario" | null;
   projects: Project[];
   onNav: (route: "command" | "project", id?: string) => void;
   onNewProject: () => void;
@@ -53,11 +52,7 @@ function Switcher({
         <span className="sw-meta">
           <span className="sw-name">{inProject && activeProject ? activeProject.name : "Centro de mando"}</span>
           <span className="sw-sub">
-            {inProject
-              ? activeType === "diario"
-                ? "Mundo · Operación diaria"
-                : "Mundo · Venture"
-              : "Vista general"}
+            {inProject ? activeProject?.tagline || "Mundo" : "Vista general"}
           </span>
         </span>
         <span className="sw-chevs">
@@ -130,7 +125,6 @@ function Switcher({
 export function Sidebar({
   inProject,
   activeProject,
-  activeType,
   activeModule,
   projects,
   onNav,
@@ -143,7 +137,6 @@ export function Sidebar({
 }: {
   inProject: boolean;
   activeProject: Project | null;
-  activeType: "venture" | "diario" | null;
   activeModule: ModuleId;
   projects: Project[];
   onNav: (route: "command" | "project", id?: string) => void;
