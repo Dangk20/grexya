@@ -541,6 +541,16 @@ input,textarea{font-family:inherit}
 .planning-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 26px;border-top:1px solid var(--line);background:var(--card);flex-shrink:0}
 .plan-cta{white-space:nowrap}
 .np-hint{font-size:12.5px;color:var(--text-3);margin:-3px 0 10px;line-height:1.45}
+
+/* ---- Editor de mapeo de Notion ---- */
+.notion-map{display:flex;flex-direction:column;gap:14px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.nmap-block{display:flex;flex-direction:column;gap:8px}
+.nmap-h{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3)}
+.nmap-rows{display:flex;flex-direction:column;gap:6px;padding-left:4px;border-left:2px solid var(--line);margin-left:2px}
+.nmap-row{display:flex;align-items:center;gap:8px}
+.nmap-from{flex:1;min-width:0;font-size:13px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nmap-sel{height:34px;min-width:150px;max-width:200px;background:var(--field);border:1px solid var(--line);border-radius:8px;padding:0 9px;color:var(--text);font-size:13px;font-family:inherit;cursor:pointer}
+.nmap-sel:focus{outline:none;border-color:var(--accent)}
 .tool-list{display:flex;flex-direction:column;gap:7px}
 .tool-row{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:13px;border:1.5px solid var(--line);text-align:left;width:100%;transition:border-color .15s,background .15s}
 .tool-row:hover{background:var(--hover)}

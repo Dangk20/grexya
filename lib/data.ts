@@ -248,6 +248,7 @@ export async function listTasksForDay(
 
 /** Carga todo el workspace para el shell: proyectos + tareas + notas. */
 export type CalendarConn = { project_id: string; email: string | null };
+export type NotionConn = { project_id: string; database_title: string | null };
 
 export async function getAppData(userId: string): Promise<{
   projects: Project[];
@@ -256,6 +257,7 @@ export async function getAppData(userId: string): Promise<{
   statuses: ProjectStatusColumn[];
   calendars: CalendarConn[];
   plannings: Planning[];
+  notions: NotionConn[];
 }> {
   const ws = await getOrCreateWorkspace(userId);
   const supabase = db();
@@ -267,9 +269,9 @@ export async function getAppData(userId: string): Promise<{
     .order("position", { ascending: true });
   const ids = (projects ?? []).map((p) => p.id);
   if (ids.length === 0) {
-    return { projects: (projects ?? []) as Project[], tasks: [], notes: [], statuses: [], calendars: [], plannings: [] };
+    return { projects: (projects ?? []) as Project[], tasks: [], notes: [], statuses: [], calendars: [], plannings: [], notions: [] };
   }
-  const [tasksRes, notesRes, statusesRes, calsRes, planRes] = await Promise.all([
+  const [tasksRes, notesRes, statusesRes, calsRes, planRes, notionRes] = await Promise.all([
     supabase
       .from("tasks")
       .select("*")
@@ -287,6 +289,7 @@ export async function getAppData(userId: string): Promise<{
       .order("position", { ascending: true }),
     supabase.from("project_calendars").select("project_id, email").in("project_id", ids),
     supabase.from("project_plannings").select("project_id, day_date, status").in("project_id", ids),
+    supabase.from("project_notions").select("project_id, database_title").in("project_id", ids),
   ]);
   return {
     projects: (projects ?? []) as Project[],
@@ -295,6 +298,7 @@ export async function getAppData(userId: string): Promise<{
     statuses: (statusesRes.data ?? []) as ProjectStatusColumn[],
     calendars: (calsRes.data ?? []) as CalendarConn[],
     plannings: (planRes.data ?? []) as Planning[],
+    notions: (notionRes.data ?? []) as NotionConn[],
   };
 }
 

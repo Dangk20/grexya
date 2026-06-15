@@ -28,6 +28,7 @@ export default async function Home() {
       statuses={data.statuses}
       calendars={data.calendars}
       plannings={data.plannings}
+      notions={data.notions}
       me={me}
     />
   );

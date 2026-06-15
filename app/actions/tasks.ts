@@ -4,7 +4,8 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getOrCreateWorkspace } from "@/lib/data";
-import type { Eisenhower, Front, Priority } from "@/lib/types";
+import { notionSyncCreate, notionSyncUpdate } from "@/lib/notion-sync";
+import type { Eisenhower, Front, Priority, Task } from "@/lib/types";
 
 async function requireUser() {
   const { userId } = await auth();
@@ -71,20 +72,25 @@ export async function createTask(input: {
     statusId = first?.id ?? null;
   }
 
-  await supabase.from("tasks").insert({
-    project_id: input.projectId,
-    title,
-    status_id: statusId,
-    front: input.front ?? null,
-    start_date: input.start_date ?? null,
-    due_date: input.due_date ?? null,
-    // prioridad = cuadrante; por defecto "Alta" (no urgente · importante)
-    eisenhower: input.eisenhower ?? "ni",
-    meeting_time: input.meeting_time ?? null,
-    day_date: input.dayDate ?? null,
-    assignee_id: userId,
-    position: Date.now(),
-  });
+  const { data: created } = await supabase
+    .from("tasks")
+    .insert({
+      project_id: input.projectId,
+      title,
+      status_id: statusId,
+      front: input.front ?? null,
+      start_date: input.start_date ?? null,
+      due_date: input.due_date ?? null,
+      // prioridad = cuadrante; por defecto "Alta" (no urgente · importante)
+      eisenhower: input.eisenhower ?? "ni",
+      meeting_time: input.meeting_time ?? null,
+      day_date: input.dayDate ?? null,
+      assignee_id: userId,
+      position: Date.now(),
+    })
+    .select("*")
+    .single();
+  if (created) await notionSyncCreate(input.projectId, created as Task);
   revalidate();
 }
 
@@ -132,10 +138,13 @@ export async function toggleTask(input: { taskId: string }) {
   const task = await assertTaskOwnership(userId, input.taskId);
   const next = !task.is_done;
   const supabase = createAdminSupabaseClient();
-  await supabase
+  const { data: updated } = await supabase
     .from("tasks")
     .update({ is_done: next, completed_at: next ? new Date().toISOString() : null })
-    .eq("id", input.taskId);
+    .eq("id", input.taskId)
+    .select("*")
+    .single();
+  if (updated) await notionSyncUpdate(updated as Task);
   revalidate();
 }
 
@@ -144,7 +153,13 @@ export async function moveTask(input: { taskId: string; statusId: string | null 
   const userId = await requireUser();
   await assertTaskOwnership(userId, input.taskId);
   const supabase = createAdminSupabaseClient();
-  await supabase.from("tasks").update({ status_id: input.statusId }).eq("id", input.taskId);
+  const { data: updated } = await supabase
+    .from("tasks")
+    .update({ status_id: input.statusId })
+    .eq("id", input.taskId)
+    .select("*")
+    .single();
+  if (updated) await notionSyncUpdate(updated as Task);
   revalidate();
 }
 
@@ -174,6 +189,12 @@ export async function updateTask(input: {
   if (Object.keys(patch).length === 0) return;
   const supabase = createAdminSupabaseClient();
   await supabase.from("tasks").update(patch).eq("id", input.taskId);
+  // Si el cambio toca un campo espejado en Notion, actualiza la página
+  const SYNCED = ["title", "status_id", "due_date", "eisenhower"];
+  if (SYNCED.some((k) => k in patch)) {
+    const { data: updated } = await supabase.from("tasks").select("*").eq("id", input.taskId).single();
+    if (updated) await notionSyncUpdate(updated as Task);
+  }
   revalidate();
 }
 

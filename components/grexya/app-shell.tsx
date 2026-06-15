@@ -22,7 +22,8 @@ import {
 } from "@/app/actions/projects";
 import { createNote, deleteNote, updateNote } from "@/app/actions/notes";
 import { disconnectCalendar } from "@/app/actions/calendar";
-import type { CalendarConn } from "@/lib/data";
+import { disconnectNotion } from "@/app/actions/notion";
+import type { CalendarConn, NotionConn } from "@/lib/data";
 import type { ModuleId, Note, Planning, Project, ProjectStatusColumn, Task } from "@/lib/types";
 
 export function AppShell({
@@ -32,6 +33,7 @@ export function AppShell({
   statuses: pStatuses,
   calendars: pCalendars,
   plannings: pPlannings,
+  notions: pNotions,
   me,
 }: {
   projects: Project[];
@@ -40,6 +42,7 @@ export function AppShell({
   statuses: ProjectStatusColumn[];
   calendars: CalendarConn[];
   plannings: Planning[];
+  notions: NotionConn[];
   me: Person;
 }) {
   const router = useRouter();
@@ -52,6 +55,7 @@ export function AppShell({
   const [statuses, setStatuses] = useSyncedState<ProjectStatusColumn[]>(pStatuses);
   const [calendars] = useSyncedState<CalendarConn[]>(pCalendars);
   const [plannings] = useSyncedState<Planning[]>(pPlannings);
+  const [notions] = useSyncedState<NotionConn[]>(pNotions);
 
   const [route, setRoute] = useState<"command" | "project">("command");
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -195,6 +199,14 @@ export function AppShell({
     const c = calendars.find((x) => x.project_id === pid);
     return { connected: !!c, email: c?.email ?? null };
   };
+  const onDisconnectNotion = async (projectId: string) => {
+    await disconnectNotion(projectId);
+    refresh();
+  };
+  const notionConn = (pid: string) => {
+    const n = notions.find((x) => x.project_id === pid);
+    return { connected: !!n, databaseTitle: n?.database_title ?? null };
+  };
   const onCreateNote = async (projectId: string) => {
     await createNote({ projectId });
     refresh();
@@ -311,11 +323,14 @@ export function AppShell({
         {settingsOpen && activeProject && (
           <ProjectSettingsModal
             project={activeProject}
+            statuses={statuses.filter((s) => s.project_id === activeProject.id)}
             onClose={() => setSettingsOpen(false)}
             onSave={(patch) => onUpdateProject(activeProject.id, patch)}
             onDelete={() => onDeleteProject(activeProject.id)}
             calendar={calConn(activeProject.id)}
             onDisconnectCalendar={() => onDisconnectCalendar(activeProject.id)}
+            notion={notionConn(activeProject.id)}
+            onDisconnectNotion={() => onDisconnectNotion(activeProject.id)}
           />
         )}
 

@@ -66,6 +66,7 @@ export type Task = {
   is_top3: boolean;
   top_rank: number | null;
   meeting_time: string | null;
+  notion_page_id: string | null;
   is_done: boolean;
   completed_at: string | null;
   position: number;

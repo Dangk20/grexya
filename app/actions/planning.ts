@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getOrCreateWorkspace } from "@/lib/data";
 import { createProjectMeeting } from "@/lib/google";
-import type { Eisenhower } from "@/lib/types";
+import { notionSyncCreate } from "@/lib/notion-sync";
+import type { Eisenhower, Task } from "@/lib/types";
 
 async function requireUser() {
   const { userId } = await auth();
@@ -107,8 +108,9 @@ export async function submitPlanning(input: {
   }
 
   if (rows.length) {
-    const { error } = await supabase.from("tasks").insert(rows);
+    const { data: created, error } = await supabase.from("tasks").insert(rows).select("*");
     if (error) return { ok: false, error: error.message };
+    for (const t of created ?? []) await notionSyncCreate(input.projectId, t as Task);
   }
 
   await supabase
