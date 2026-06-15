@@ -375,6 +375,19 @@ input,textarea{font-family:inherit}
 .mt-row{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--text-2)}
 .mt-att{display:flex;flex-wrap:wrap;gap:6px}
 .mt-chip{font-size:12px;color:var(--text-2);background:var(--field);border-radius:20px;padding:3px 10px}
+
+/* ---- Distribución de trabajo (Inicio) ---- */
+.worksplit{margin:0 0 22px;padding:15px 18px;border:1px solid var(--line);border-radius:16px;background:var(--card)}
+.worksplit.empty{display:flex;flex-direction:column;gap:6px}
+.worksplit-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:11px;flex-wrap:wrap}
+.worksplit-label{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3)}
+.worksplit-top{font-size:13px;color:var(--text-2)}
+.worksplit-bar{display:flex;height:14px;border-radius:20px;overflow:hidden;background:var(--hover);gap:2px}
+.worksplit-seg{height:100%;transition:width .5s var(--ease);min-width:4px}
+.worksplit-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:11px}
+.worksplit-leg{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-2)}
+.worksplit-dot{width:9px;height:9px;border-radius:3px;flex-shrink:0}
+.worksplit-leg b{color:var(--text);font-weight:700}
 .meet-time{font-size:12px;font-weight:700;color:color-mix(in oklab,var(--c) 60%,var(--text));background:color-mix(in oklab,var(--c) 13%,transparent);padding:3px 7px;border-radius:6px;flex-shrink:0}
 .meet-title{flex:1;font-size:13.5px;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .notes{display:grid;grid-template-columns:262px 1fr;gap:18px;align-items:start}

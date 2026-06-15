@@ -368,6 +368,65 @@ function MeetingsPanel({
   );
 }
 
+/** Barra apilada: del total de tareas hechas, qué % aportó cada proyecto. */
+function WorkSplitBar({ projects, tasks }: { projects: Project[]; tasks: Task[] }) {
+  const { rows, total } = useMemo(() => {
+    const r = projects
+      .map((p) => ({
+        p,
+        done: tasks.filter((t) => t.project_id === p.id && !t.parent_task_id && t.is_done).length,
+      }))
+      .filter((x) => x.done > 0)
+      .sort((a, b) => b.done - a.done);
+    return { rows: r, total: r.reduce((s, x) => s + x.done, 0) };
+  }, [projects, tasks]);
+
+  const pct = (n: number) => Math.round((n / total) * 100);
+
+  if (total === 0) {
+    return (
+      <div className="worksplit empty">
+        <span className="worksplit-label">Distribución de trabajo</span>
+        <p className="faint" style={{ fontSize: 13, margin: 0 }}>
+          Aún no has completado tareas. Cuando marques tareas como hechas verás aquí en qué proyecto avanzas más.
+        </p>
+      </div>
+    );
+  }
+
+  const top = rows[0];
+  return (
+    <div className="worksplit">
+      <div className="worksplit-head">
+        <span className="worksplit-label">Distribución de trabajo · {total} hechas</span>
+        <span className="worksplit-top">
+          Más avance:{" "}
+          <b style={{ color: top.p.accent ?? "var(--text)" }}>{top.p.name}</b> · {pct(top.done)}%
+        </span>
+      </div>
+      <div className="worksplit-bar">
+        {rows.map((r) => (
+          <span
+            key={r.p.id}
+            className="worksplit-seg"
+            style={{ width: `${pct(r.done)}%`, background: r.p.accent ?? "#8A8A84" }}
+            title={`${r.p.name} · ${r.done} hechas (${pct(r.done)}%)`}
+          />
+        ))}
+      </div>
+      <div className="worksplit-legend">
+        {rows.map((r) => (
+          <span key={r.p.id} className="worksplit-leg">
+            <span className="worksplit-dot" style={{ background: r.p.accent ?? "#8A8A84" }} />
+            {r.p.name}
+            <b className="mono">{pct(r.done)}%</b>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function CommandCenter({
   projects,
   tasks,
@@ -410,6 +469,8 @@ export function CommandCenter({
           agendadas en tus {projects.length} mundos.
         </p>
       </header>
+
+      <WorkSplitBar projects={projects} tasks={tasks} />
 
       <div className="pcards">
         {projects.map((p) => (

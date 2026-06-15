@@ -38,12 +38,14 @@ export function PlanningModal({
   tasks,
   calendarConn,
   dayISO,
+  blocking = false,
   onClose,
 }: {
   project: Project;
   tasks: Task[];
   calendarConn: { connected: boolean; email: string | null };
   dayISO: string;
+  blocking?: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -56,6 +58,16 @@ export function PlanningModal({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const idRef = useRef(1);
+
+  // Cerrar con Escape solo cuando no es bloqueante (apertura manual / daily)
+  useEffect(() => {
+    if (blocking) return;
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [blocking, onClose]);
 
   // ---- Retro: último día con actividad (tareas/reuniones completadas) antes de dayISO ----
   const retro = useMemo(() => {
@@ -149,6 +161,11 @@ export function PlanningModal({
             Planning time
           </div>
           <span className="planning-day">{fmtDay(dayISO)}</span>
+          {!blocking && (
+            <button className="icon-btn sm" onClick={onClose} title="Cerrar" style={{ marginLeft: 4 }}>
+              <Icon name="x" size={17} />
+            </button>
+          )}
         </div>
 
         {/* ---- Retro: ¿qué hiciste? ---- */}
@@ -350,9 +367,15 @@ export function PlanningModal({
         )}
 
         <div className="planning-foot">
-          <button className="btn btn-ghost" onClick={skip} disabled={saving}>
-            Hoy no planifico
-          </button>
+          {blocking ? (
+            <button className="btn btn-ghost" onClick={skip} disabled={saving}>
+              Hoy no planifico
+            </button>
+          ) : (
+            <button className="btn btn-ghost" onClick={onClose} disabled={saving}>
+              Cerrar
+            </button>
+          )}
           <div style={{ display: "flex", gap: 10 }}>
             {step === 2 && (
               <button className="btn btn-soft" onClick={() => setStep(1)} disabled={saving}>

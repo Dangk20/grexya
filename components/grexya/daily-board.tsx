@@ -208,6 +208,7 @@ export function DailyBoard({
   const [gmeetings, setGmeetings] = useState<Meeting[]>([]);
   const [meetFormOpen, setMeetFormOpen] = useState(false);
   const [planningOpen, setPlanningOpen] = useState(false);
+  const [planningBlocking, setPlanningBlocking] = useState(false);
   const [preview, setPreview] = useState<MeetPreview | null>(null);
   const autoRef = useRef<string | null>(null);
   const d = new Date();
@@ -230,6 +231,7 @@ export function DailyBoard({
     if (dayISO === todayISO() && dayTaskCount === 0 && !dayPlanned) {
       autoRef.current = dayISO;
       // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPlanningBlocking(true);
       setPlanningOpen(true);
     }
   }, [dayISO, dayTaskCount, dayPlanned]);
@@ -308,12 +310,16 @@ export function DailyBoard({
           <button className="icon-btn btn-line" style={{ width: 32 }} onClick={() => setOffset((o) => o + 1)}>
             <Icon name="chevRight" size={17} />
           </button>
-          {canPlan && (
-            <button className="btn btn-accent plan-cta" onClick={() => setPlanningOpen(true)}>
-              <Icon name="target" size={15} />
-              Iniciar planning time
-            </button>
-          )}
+          <button
+            className="btn btn-accent plan-cta"
+            onClick={() => {
+              setPlanningBlocking(false);
+              setPlanningOpen(true);
+            }}
+          >
+            <Icon name="target" size={15} />
+            {canPlan ? "Iniciar planning time" : "Planning · Daily"}
+          </button>
         </div>
       </div>
 
@@ -540,6 +546,7 @@ export function DailyBoard({
           tasks={tasks}
           calendarConn={calendarConn}
           dayISO={dayISO}
+          blocking={planningBlocking}
           onClose={() => setPlanningOpen(false)}
         />
       )}
