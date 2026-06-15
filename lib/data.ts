@@ -228,7 +228,20 @@ export async function listTasksForProject(projectId: string): Promise<Task[]> {
     .from("tasks")
     .select("*")
     .eq("project_id", projectId)
+    .is("deleted_at", null)
     .order("position", { ascending: true });
+  return (data ?? []) as Task[];
+}
+
+/** Tareas en la papelera de un proyecto (borradas, ordenadas por fecha de borrado). */
+export async function listDeletedTasks(projectId: string): Promise<Task[]> {
+  const { data } = await db()
+    .from("tasks")
+    .select("*")
+    .eq("project_id", projectId)
+    .is("parent_task_id", null)
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false });
   return (data ?? []) as Task[];
 }
 
@@ -242,6 +255,7 @@ export async function listTasksForDay(
     .select("*")
     .eq("project_id", projectId)
     .eq("day_date", day)
+    .is("deleted_at", null)
     .order("position", { ascending: true });
   return (data ?? []) as Task[];
 }
@@ -276,6 +290,7 @@ export async function getAppData(userId: string): Promise<{
       .from("tasks")
       .select("*")
       .in("project_id", ids)
+      .is("deleted_at", null)
       .order("position", { ascending: true }),
     supabase
       .from("notes")
@@ -328,6 +343,7 @@ export async function listAllTasks(userId: string): Promise<TaskWithProject[]> {
     .select("*, project:projects!inner(id,name,slug,emoji,color,workspace_id)")
     .eq("project.workspace_id", ws.id)
     .is("parent_task_id", null)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
   return (data ?? []) as unknown as TaskWithProject[];
 }

@@ -69,6 +69,7 @@ export type Task = {
   notion_page_id: string | null;
   is_done: boolean;
   completed_at: string | null;
+  deleted_at: string | null;
   position: number;
   created_at: string;
   updated_at: string;

@@ -551,6 +551,18 @@ input,textarea{font-family:inherit}
 .nmap-from{flex:1;min-width:0;font-size:13px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nmap-sel{height:34px;min-width:150px;max-width:200px;background:var(--field);border:1px solid var(--line);border-radius:8px;padding:0 9px;color:var(--text);font-size:13px;font-family:inherit;cursor:pointer}
 .nmap-sel:focus{outline:none;border-color:var(--accent)}
+
+/* ---- Papelera (soft-delete) ---- */
+.trash-head{display:flex;align-items:center;gap:9px;width:100%;background:none;border:none;cursor:pointer;color:var(--text-2);padding:2px 0}
+.trash-list{display:flex;flex-direction:column;gap:6px;margin:6px 0}
+.trash-item{display:flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:var(--card)}
+.trash-title{flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- Toast de deshacer ---- */
+.gx-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:90;display:flex;align-items:center;gap:11px;padding:9px 11px 9px 15px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 38px var(--sh2);animation:mIn .22s var(--ease)}
+.gx-toast-msg{font-size:13.5px;font-weight:500;color:var(--text)}
+.gx-toast-undo{font-size:13px;font-weight:700;color:var(--accent);background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:7px}
+.gx-toast-undo:hover{background:var(--hover)}
 .tool-list{display:flex;flex-direction:column;gap:7px}
 .tool-row{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:13px;border:1.5px solid var(--line);text-align:left;width:100%;transition:border-color .15s,background .15s}
 .tool-row:hover{background:var(--hover)}

@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { createNotionPage, updateNotionPage, type NotionConn } from "@/lib/notion";
+import { archiveNotionPage, createNotionPage, updateNotionPage, type NotionConn } from "@/lib/notion";
 import type { Task } from "@/lib/types";
 
 /** Conexión de Notion de un proyecto (o null si no está conectado). */
@@ -44,5 +44,16 @@ export async function notionSyncUpdate(task: Task): Promise<void> {
     }
   } catch (e) {
     console.error("[notion] update falló:", e instanceof Error ? e.message : e);
+  }
+}
+
+/** Archiva o restaura en Notion la página espejo de una tarea (papelera). */
+export async function notionSyncArchive(projectId: string, pageId: string, archived: boolean): Promise<void> {
+  try {
+    const conn = await connFor(projectId);
+    if (!conn) return;
+    await archiveNotionPage(conn, pageId, archived);
+  } catch (e) {
+    console.error("[notion] archive falló:", e instanceof Error ? e.message : e);
   }
 }

@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/grexya/icon";
 import { IconField, IconPreview } from "@/components/grexya/icon-field";
 import { connectNotion, getNotionConfig, saveNotionMapping } from "@/app/actions/notion";
+import { listTrash, restoreTask, hardDeleteTask } from "@/app/actions/tasks";
 import { QUAD_META, type Quad } from "@/lib/grexya-helpers";
 import type { NotionConfig, NotionMapping } from "@/lib/notion-types";
-import type { ModuleId, Project, ProjectStatusColumn } from "@/lib/types";
+import type { ModuleId, Project, ProjectStatusColumn, Task } from "@/lib/types";
 
 const QUADS: Quad[] = ["ui", "ni", "un", "nn"];
 
@@ -186,6 +187,8 @@ export function ProjectSettingsModal({
           onDisconnect={onDisconnectNotion}
         />
 
+        <TrashSection projectId={project.id} />
+
         <div className="modal-foot" style={{ justifyContent: "space-between" }}>
           <button
             className="btn btn-ghost"
@@ -210,6 +213,69 @@ export function ProjectSettingsModal({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TrashSection({ projectId }: { projectId: string }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<Task[] | null>(null);
+
+  const load = () => listTrash(projectId).then(setItems).catch(() => setItems([]));
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    if (next && items === null) load();
+  };
+  const restore = async (id: string) => {
+    setItems((its) => its?.filter((t) => t.id !== id) ?? null);
+    await restoreTask({ taskId: id });
+    router.refresh();
+  };
+  const purge = async (id: string, title: string) => {
+    if (!confirm(`¿Borrar definitivamente "${title}"? Esto no se puede deshacer.`)) return;
+    setItems((its) => its?.filter((t) => t.id !== id) ?? null);
+    await hardDeleteTask({ taskId: id });
+    router.refresh();
+  };
+
+  return (
+    <div className="np-field">
+      <button className="trash-head" onClick={toggle}>
+        <Icon name="trash" size={15} />
+        <span className="np-label" style={{ margin: 0 }}>
+          Papelera{items ? ` · ${items.length}` : ""}
+        </span>
+        <Icon name={open ? "chevDown" : "chevRight"} size={15} className="faint" style={{ marginLeft: "auto" }} />
+      </button>
+      {open &&
+        (items === null ? (
+          <p className="np-hint">Cargando…</p>
+        ) : items.length === 0 ? (
+          <p className="np-hint">La papelera está vacía.</p>
+        ) : (
+          <div className="trash-list">
+            {items.map((t) => (
+              <div className="trash-item" key={t.id}>
+                <span className="trash-title">{t.title}</span>
+                <button className="btn btn-line" style={{ height: 30 }} onClick={() => restore(t.id)}>
+                  <Icon name="check" size={14} />
+                  Restaurar
+                </button>
+                <button
+                  className="icon-btn sm"
+                  title="Borrar definitivamente"
+                  style={{ color: "#E5484D" }}
+                  onClick={() => purge(t.id, t.title)}
+                >
+                  <Icon name="x" size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        ))}
+      <p className="np-hint">Las tareas borradas se conservan aquí hasta que las restaures o las elimines del todo.</p>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getOrCreateWorkspace } from "@/lib/data";
-import { notionSyncCreate, notionSyncUpdate } from "@/lib/notion-sync";
+import { notionSyncArchive, notionSyncCreate, notionSyncUpdate } from "@/lib/notion-sync";
 import type { Eisenhower, Front, Priority, Task } from "@/lib/types";
 
 async function requireUser() {
@@ -238,7 +238,68 @@ export async function reorderSubtasks(input: {
   revalidate();
 }
 
+/** Soft-delete: manda la tarea (y sus subtareas) a la papelera y archiva su página de Notion. */
 export async function deleteTask(input: { taskId: string }) {
+  const userId = await requireUser();
+  const task = await assertTaskOwnership(userId, input.taskId);
+  const supabase = createAdminSupabaseClient();
+  const { data: row } = await supabase
+    .from("tasks")
+    .select("notion_page_id")
+    .eq("id", input.taskId)
+    .maybeSingle();
+  await supabase
+    .from("tasks")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("project_id", task.project_id)
+    .or(`id.eq.${input.taskId},parent_task_id.eq.${input.taskId}`);
+  if (row?.notion_page_id) await notionSyncArchive(task.project_id, row.notion_page_id, true);
+  revalidate();
+}
+
+/** Restaura una tarea (y sus subtareas) desde la papelera y la desarchiva en Notion. */
+export async function restoreTask(input: { taskId: string }) {
+  const userId = await requireUser();
+  const task = await assertTaskOwnership(userId, input.taskId);
+  const supabase = createAdminSupabaseClient();
+  await supabase
+    .from("tasks")
+    .update({ deleted_at: null })
+    .eq("project_id", task.project_id)
+    .or(`id.eq.${input.taskId},parent_task_id.eq.${input.taskId}`);
+  const { data: row } = await supabase
+    .from("tasks")
+    .select("notion_page_id")
+    .eq("id", input.taskId)
+    .maybeSingle();
+  if (row?.notion_page_id) await notionSyncArchive(task.project_id, row.notion_page_id, false);
+  revalidate();
+}
+
+/** Tareas en la papelera de un proyecto (para restaurar o purgar). */
+export async function listTrash(projectId: string): Promise<Task[]> {
+  const userId = await requireUser();
+  const ws = await getOrCreateWorkspace(userId);
+  const supabase = createAdminSupabaseClient();
+  const { data: proj } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("id", projectId)
+    .eq("workspace_id", ws.id)
+    .maybeSingle();
+  if (!proj) throw new Error("Proyecto no encontrado");
+  const { data } = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("project_id", projectId)
+    .is("parent_task_id", null)
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false });
+  return (data ?? []) as Task[];
+}
+
+/** Borra definitivamente una tarea (y sus subtareas, por cascade). No reversible. */
+export async function hardDeleteTask(input: { taskId: string }) {
   const userId = await requireUser();
   await assertTaskOwnership(userId, input.taskId);
   const supabase = createAdminSupabaseClient();
@@ -246,7 +307,7 @@ export async function deleteTask(input: { taskId: string }) {
   revalidate();
 }
 
-/** Elimina varias tareas a la vez (scoped al workspace del usuario). */
+/** Soft-delete de varias tareas a la vez (scoped al workspace del usuario). */
 export async function deleteTasks(input: { taskIds: string[] }) {
   const userId = await requireUser();
   if (input.taskIds.length === 0) return;
@@ -257,10 +318,19 @@ export async function deleteTasks(input: { taskIds: string[] }) {
     .select("id")
     .eq("workspace_id", ws.id);
   const pids = (projs ?? []).map((p) => p.id);
-  await supabase
+  const idList = input.taskIds.join(",");
+  const { data: rows } = await supabase
     .from("tasks")
-    .delete()
+    .select("project_id, notion_page_id")
     .in("id", input.taskIds)
     .in("project_id", pids);
+  await supabase
+    .from("tasks")
+    .update({ deleted_at: new Date().toISOString() })
+    .in("project_id", pids)
+    .or(`id.in.(${idList}),parent_task_id.in.(${idList})`);
+  for (const r of rows ?? []) {
+    if (r.notion_page_id) await notionSyncArchive(r.project_id as string, r.notion_page_id as string, true);
+  }
   revalidate();
 }

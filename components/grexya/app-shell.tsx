@@ -66,6 +66,7 @@ export function AppShell({
   const [navOpen, setNavOpen] = useState(true);
   const [chatOpen, setChatOpen] = useState(false);
   const [pendingSlug, setPendingSlug] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; ids: string[] } | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -157,12 +158,21 @@ export function AppShell({
   const deleteTask = async (id: string) => {
     setTasks((ts) => ts.filter((t) => t.id !== id && t.parent_task_id !== id));
     await taskActions.deleteTask({ taskId: id });
+    setToast({ msg: "Tarea movida a la papelera", ids: [id] });
     refresh();
   };
   const deleteTasks = async (ids: string[]) => {
     const set = new Set(ids);
     setTasks((ts) => ts.filter((t) => !set.has(t.id) && !(t.parent_task_id && set.has(t.parent_task_id))));
     await taskActions.deleteTasks({ taskIds: ids });
+    setToast({ msg: `${ids.length} ${ids.length === 1 ? "tarea movida" : "tareas movidas"} a la papelera`, ids });
+    refresh();
+  };
+  const undoDelete = async () => {
+    const ids = toast?.ids ?? [];
+    setToast(null);
+    if (!ids.length) return;
+    await Promise.all(ids.map((id) => taskActions.restoreTask({ taskId: id })));
     refresh();
   };
   const onCreateProject = async (data: {
@@ -345,7 +355,29 @@ export function AppShell({
           </button>
         )}
         {chatOpen && <ChatPanel project={chatProject} onClose={() => setChatOpen(false)} />}
+
+        {toast && <UndoToast msg={toast.msg} onUndo={undoDelete} onClose={() => setToast(null)} />}
       </div>
     </PeopleProvider>
+  );
+}
+
+function UndoToast({ msg, onUndo, onClose }: { msg: string; onUndo: () => void; onClose: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 8000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <div className="gx-toast" role="status">
+      <Icon name="trash" size={15} className="faint" />
+      <span className="gx-toast-msg">{msg}</span>
+      <button className="gx-toast-undo" onClick={onUndo}>
+        Deshacer
+      </button>
+      <button className="icon-btn sm" onClick={onClose} title="Cerrar">
+        <Icon name="x" size={14} />
+      </button>
+    </div>
   );
 }

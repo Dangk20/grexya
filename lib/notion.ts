@@ -120,6 +120,14 @@ export async function updateNotionPage(conn: NotionConn, pageId: string, task: T
   });
 }
 
+/** Archiva (papelera de Notion) o restaura la página espejo. */
+export async function archiveNotionPage(conn: NotionConn, pageId: string, archived: boolean): Promise<void> {
+  await notionFetch(conn.access_token, `/pages/${pageId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ archived }),
+  });
+}
+
 const includesAny = (s: string, words: string[]) => words.some((w) => s.includes(w));
 
 /** Construye un mapeo por defecto detectando propiedades por tipo/nombre. */
