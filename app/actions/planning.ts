@@ -75,16 +75,17 @@ export async function submitPlanning(input: {
     const title = item.title.trim();
     if (!title) continue;
 
-    // Reunión agendada en Google → solo evento, sin fila en el sistema
+    // Reunión agendada en Google → solo evento. Si Google falla, NO se pierde:
+    // cae a una reunión en el sistema (abajo) para que siempre quede registrada.
     if (item.kind === "meeting" && item.google) {
-      await createProjectMeeting(input.projectId, {
+      const res = await createProjectMeeting(input.projectId, {
         title,
         dateISO: input.dayDate,
         startTime: item.google.time,
         endTime: plus30(item.google.time),
         addMeet: item.google.addMeet,
       });
-      continue;
+      if (res.ok) continue;
     }
 
     const isMeet = item.kind === "meeting";
@@ -100,7 +101,7 @@ export async function submitPlanning(input: {
       eisenhower: isMeet ? "reunion" : item.eisenhower ?? "ni",
       start_date: input.dayDate,
       due_date: isMeet ? input.dayDate : null,
-      meeting_time: isMeet ? item.meeting_time ?? null : null,
+      meeting_time: isMeet ? item.meeting_time ?? item.google?.time ?? null : null,
       is_top3: isTop,
       top_rank: isTop ? topCounter : null,
       day_date: isTop ? input.dayDate : null,

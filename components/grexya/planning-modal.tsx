@@ -92,7 +92,7 @@ export function PlanningModal({
     if (!t) return;
     setDrafts((ds) => [
       ...ds,
-      { id: idRef.current++, title: t, kind: "task", eisenhower: "ni", top3: false, time: "09:00", google: calendarConn.connected },
+      { id: idRef.current++, title: t, kind: "task", eisenhower: "ni", top3: false, time: "09:00", google: false },
     ]);
   };
   const patch = (id: number, p: Partial<Draft>) =>
