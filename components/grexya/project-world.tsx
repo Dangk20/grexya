@@ -16,7 +16,7 @@ import {
 import { DailyBoard } from "@/components/grexya/daily-board";
 import { NotesView } from "@/components/grexya/notes-view";
 import { ProjectIcon } from "@/components/grexya/project-icon";
-import { coverFor, projectProgress, subStats } from "@/lib/grexya-helpers";
+import { coverFor, projectProgress, quadOf, QUAD_RANK, subStats } from "@/lib/grexya-helpers";
 import type { ModuleId, Note, Planning, Project, ProjectStatusColumn, Task } from "@/lib/types";
 
 export const COLOR_HEX: Record<string, string> = {
@@ -293,6 +293,15 @@ function Kanban({
   );
 }
 
+type SortKey = "prio" | "due" | "status" | "name" | "recent";
+const SORT_OPTS: { id: SortKey; label: string }[] = [
+  { id: "prio", label: "Prioridad" },
+  { id: "due", label: "Plazo" },
+  { id: "status", label: "Estado" },
+  { id: "name", label: "Nombre (A–Z)" },
+  { id: "recent", label: "Más recientes" },
+];
+
 function ProjectList({
   projectId,
   tasks,
@@ -308,20 +317,37 @@ function ProjectList({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const [sort, setSort] = useState<SortKey>("prio");
+  const [sortOpen, setSortOpen] = useState(false);
   const submitNew = () => {
     const t = newTitle.trim();
     if (t) h.onCreateTask({ projectId, title: t, statusId: statuses[0]?.id ?? null });
     setNewTitle("");
   };
   const statusById = new Map(statuses.map((s) => [s.id, s]));
+  const statusPos = (t: Task) => statusById.get(t.status_id ?? "")?.position ?? 99;
   const rows = tasks
     .filter((t) => !t.parent_task_id)
     .slice()
     .sort((a, b) => {
+      // Las completadas siempre al final
       const ad = a.is_done ? 1 : 0;
       const bd = b.is_done ? 1 : 0;
       if (ad !== bd) return ad - bd;
-      return (a.due_date ?? "9").localeCompare(b.due_date ?? "9");
+      switch (sort) {
+        case "prio":
+          return QUAD_RANK[quadOf(a)] - QUAD_RANK[quadOf(b)];
+        case "due":
+          return (a.due_date ?? "9").localeCompare(b.due_date ?? "9");
+        case "status":
+          return statusPos(a) - statusPos(b);
+        case "name":
+          return a.title.localeCompare(b.title);
+        case "recent":
+          return (b.created_at ?? "").localeCompare(a.created_at ?? "");
+        default:
+          return 0;
+      }
     });
 
   const toggleSel = (id: string) =>
@@ -372,6 +398,33 @@ function ProjectList({
           </div>
         ) : (
           <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ position: "relative", display: "flex" }}>
+              <button className="list-tool-btn" onClick={() => setSortOpen((o) => !o)}>
+                <Icon name="list" size={15} />
+                Ordenar: {SORT_OPTS.find((s) => s.id === sort)?.label}
+                <Icon name="chevDown" size={14} className="faint" />
+              </button>
+              {sortOpen && (
+                <>
+                  <div className="pop-scrim" onClick={() => setSortOpen(false)} />
+                  <div className="pop" style={{ left: "auto", right: 0 }}>
+                    {SORT_OPTS.map((s) => (
+                      <button
+                        key={s.id}
+                        className="pop-item"
+                        onClick={() => {
+                          setSort(s.id);
+                          setSortOpen(false);
+                        }}
+                      >
+                        {s.label}
+                        {sort === s.id && <Icon name="check" size={15} style={{ marginLeft: "auto" }} />}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
             <button
               className="list-tool-btn"
               style={{ background: "var(--ink-btn)", color: "var(--ink-btn-text)", borderColor: "transparent" }}
