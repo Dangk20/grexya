@@ -15,9 +15,10 @@ const API = "https://api.notion.com/v1";
 
 /** Extrae el ID de la DB desde una URL de Notion o un ID suelto (con o sin guiones). */
 export function parseDatabaseId(input: string): string | null {
-  const clean = input.trim();
-  // Toma la última secuencia de 32 hex (ignora guiones), típica de los IDs de Notion
-  const m = clean.replace(/-/g, "").match(/[0-9a-fA-F]{32}/g);
+  // Descarta query/hash (?v=<vista>, #..) para no confundir el ID de la vista con el de la DB
+  const path = input.trim().split(/[?#]/)[0];
+  // El ID de la DB es la última secuencia de 32 hex del path (ignorando guiones)
+  const m = path.replace(/-/g, "").match(/[0-9a-fA-F]{32}/g);
   if (!m || !m.length) return null;
   const id = m[m.length - 1].toLowerCase();
   // formatea con guiones (8-4-4-4-12)
