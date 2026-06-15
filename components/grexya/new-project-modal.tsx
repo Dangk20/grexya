@@ -18,12 +18,13 @@ export function NewProjectModal({
   onCreate,
 }: {
   onClose: () => void;
-  onCreate: (data: { emoji: string; name: string; accent: string; icon_url: string | null; modules: ModuleId[] }) => void;
+  onCreate: (data: { emoji: string; name: string; tagline: string; accent: string; icon_url: string | null; modules: ModuleId[] }) => void;
 }) {
   const [closing, setClosing] = useState(false);
   const [emoji, setEmoji] = useState("🚀");
   const [iconUrl, setIconUrl] = useState<string | null>(null);
   const [name, setName] = useState("");
+  const [tagline, setTagline] = useState("");
   const [accent, setAccent] = useState("#5B5BD6");
   const [tools, setTools] = useState<ModuleId[]>(["hoy", "kanban", "lista", "notas"]);
 
@@ -44,7 +45,7 @@ export function NewProjectModal({
 
   const create = () => {
     const mods = TOOLS.filter((t) => tools.includes(t.id)).map((t) => t.id);
-    onCreate({ emoji, name: name.trim() || "Nuevo proyecto", accent, icon_url: iconUrl, modules: mods.length ? mods : ["hoy", "lista"] });
+    onCreate({ emoji, name: name.trim() || "Nuevo proyecto", tagline: tagline.trim(), accent, icon_url: iconUrl, modules: mods.length ? mods : ["hoy", "lista"] });
     close();
   };
 
@@ -67,6 +68,18 @@ export function NewProjectModal({
             value={name}
             autoFocus
             onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && create()}
+          />
+        </div>
+
+        <div className="np-field">
+          <span className="np-label">Subtítulo</span>
+          <input
+            className="field"
+            style={{ width: "100%" }}
+            placeholder="Describe el mundo en una frase"
+            value={tagline}
+            onChange={(e) => setTagline(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && create()}
           />
         </div>

@@ -13,7 +13,6 @@ import { ChatPanel } from "@/components/grexya/chat-panel";
 import { NewProjectModal } from "@/components/grexya/new-project-modal";
 import { ProjectSettingsModal } from "@/components/grexya/project-settings-modal";
 import { useSyncedState } from "@/lib/use-synced-state";
-import { deriveType } from "@/lib/grexya-helpers";
 import * as taskActions from "@/app/actions/tasks";
 import * as statusActions from "@/app/actions/statuses";
 import {
@@ -165,6 +164,7 @@ export function AppShell({
   const onCreateProject = async (data: {
     emoji: string;
     name: string;
+    tagline: string;
     accent: string;
     icon_url: string | null;
     modules: ModuleId[];
@@ -175,7 +175,7 @@ export function AppShell({
   };
   const onUpdateProject = async (
     projectId: string,
-    patch: { name: string; emoji: string; icon_url: string | null; accent: string; modules: ModuleId[] },
+    patch: { name: string; emoji: string; tagline: string; icon_url: string | null; accent: string; modules: ModuleId[] },
   ) => {
     const cover = `linear-gradient(120deg, ${patch.accent}, color-mix(in oklab, ${patch.accent} 55%, #fff))`;
     await updateProjectAction({ projectId, ...patch, cover });
@@ -214,7 +214,6 @@ export function AppShell({
   const activeProject = projects.find((p) => p.id === activeId) ?? null;
   const inProject = route === "project" && !!activeProject;
   const projTasks = (pid: string) => tasks.filter((t) => t.project_id === pid);
-  const activeType = activeProject ? deriveType(projTasks(activeProject.id)) : null;
   const openTask = openTaskId ? tasks.find((t) => t.id === openTaskId) ?? null : null;
   const openTaskProject = openTask ? projects.find((p) => p.id === openTask.project_id) ?? null : null;
   const chatProject = activeProject ?? projects[0] ?? null;
@@ -250,7 +249,6 @@ export function AppShell({
         <Sidebar
           inProject={inProject}
           activeProject={activeProject}
-          activeType={activeType}
           activeModule={activeModule}
           projects={projects}
           onNav={nav}

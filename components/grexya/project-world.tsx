@@ -16,7 +16,7 @@ import {
 import { DailyBoard } from "@/components/grexya/daily-board";
 import { NotesView } from "@/components/grexya/notes-view";
 import { ProjectIcon } from "@/components/grexya/project-icon";
-import { coverFor, deriveType, projectProgress, subStats } from "@/lib/grexya-helpers";
+import { coverFor, projectProgress, subStats } from "@/lib/grexya-helpers";
 import type { ModuleId, Note, Planning, Project, ProjectStatusColumn, Task } from "@/lib/types";
 
 export const COLOR_HEX: Record<string, string> = {
@@ -523,7 +523,6 @@ export function ProjectWorld({
   h: WorldHandlers;
 }) {
   const { total, done, pct } = projectProgress(tasks);
-  const ptype = deriveType(tasks);
   return (
     <div
       className="world fade-in"
@@ -542,10 +541,7 @@ export function ProjectWorld({
           </div>
           <div className="world-titlerow">
             <div>
-              <div className="world-title">
-                {project.name}
-                <span className="world-type">{ptype === "diario" ? "Operación diaria" : "Venture"}</span>
-              </div>
+              <div className="world-title">{project.name}</div>
               <div className="world-tagline">{project.tagline}</div>
             </div>
             <div className="world-vmeta">

@@ -13,7 +13,6 @@ import {
 } from "@/components/grexya/atoms";
 import { ProjectIcon } from "@/components/grexya/project-icon";
 import {
-  deriveType,
   dueOffset,
   greeting,
   isMeeting,
@@ -43,7 +42,6 @@ function ProjectCard({
 }) {
   const { pct } = projectProgress(tasks);
   const open = tasks.filter((t) => !t.parent_task_id && !t.is_done).length;
-  const ptype = deriveType(tasks);
   return (
     <button
       className="pcard"
@@ -54,10 +52,7 @@ function ProjectCard({
       <span className="pcard-emoji">
         <ProjectIcon project={project} />
       </span>
-      <span className="pcard-name">
-        {project.name}
-        <span className="pcard-type">{ptype === "diario" ? "Diario" : "Venture"}</span>
-      </span>
+      <span className="pcard-name">{project.name}</span>
       <span className="pcard-tag">{project.tagline}</span>
       <span className="pcard-foot">
         <span className="pcard-stat mono">{open} abiertas</span>

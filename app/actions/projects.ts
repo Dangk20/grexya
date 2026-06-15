@@ -35,6 +35,7 @@ const VENTURE_STATUSES = [
 export async function createProject(input: {
   name: string;
   emoji?: string;
+  tagline?: string;
   accent?: string;
   icon_url?: string | null;
   modules?: ModuleId[];
@@ -81,7 +82,7 @@ export async function createProject(input: {
       emoji: input.emoji || "🚀",
       accent,
       cover: coverFor(accent),
-      tagline: "Nuevo mundo en construcción",
+      tagline: input.tagline?.trim() || "Nuevo mundo en construcción",
       icon_url: input.icon_url ?? null,
       modules,
       position: count ?? 0,

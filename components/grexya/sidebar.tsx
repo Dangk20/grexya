@@ -21,7 +21,6 @@ export function modulesFor(project: Project) {
 function Switcher({
   inProject,
   activeProject,
-  activeType,
   projects,
   onNav,
   onNewProject,
@@ -173,7 +172,6 @@ export function Sidebar({
       <Switcher
         inProject={inProject}
         activeProject={activeProject}
-        activeType={activeType}
         projects={projects}
         onNav={onNav}
         onNewProject={onNewProject}

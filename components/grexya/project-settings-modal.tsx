@@ -26,6 +26,7 @@ export function ProjectSettingsModal({
   onSave: (patch: {
     name: string;
     emoji: string;
+    tagline: string;
     icon_url: string | null;
     accent: string;
     modules: ModuleId[];
@@ -36,6 +37,7 @@ export function ProjectSettingsModal({
 }) {
   const [closing, setClosing] = useState(false);
   const [name, setName] = useState(project.name);
+  const [tagline, setTagline] = useState(project.tagline ?? "");
   const [emoji, setEmoji] = useState(project.emoji ?? "📦");
   const [iconUrl, setIconUrl] = useState<string | null>(project.icon_url);
   const [accent, setAccent] = useState(project.accent ?? "#5B5BD6");
@@ -62,6 +64,7 @@ export function ProjectSettingsModal({
       onSave({
         name: name.trim() || project.name,
         emoji,
+        tagline: tagline.trim() || project.tagline || "",
         icon_url: iconUrl,
         accent,
         modules: tools.length ? tools : ["hoy", "lista"],
@@ -88,6 +91,18 @@ export function ProjectSettingsModal({
             placeholder="Nombre del proyecto"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && save()}
+          />
+        </div>
+
+        <div className="np-field">
+          <span className="np-label">Subtítulo</span>
+          <input
+            className="field"
+            style={{ width: "100%" }}
+            placeholder="Describe el mundo en una frase"
+            value={tagline}
+            onChange={(e) => setTagline(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && save()}
           />
         </div>
