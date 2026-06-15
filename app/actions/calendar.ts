@@ -71,6 +71,35 @@ export async function createMeeting(
   return createProjectMeeting(projectId, input);
 }
 
+/** Marca/desmarca una reunión de Google como "ya la tuve" (estado local por evento). */
+export async function toggleMeetingDone(
+  projectId: string,
+  eventId: string,
+  done: boolean,
+): Promise<{ ok: boolean }> {
+  const userId = await requireUser();
+  await assertProjectOwnership(userId, projectId);
+  const supabase = createAdminSupabaseClient();
+  if (done) {
+    await supabase.from("meeting_completions").upsert(
+      {
+        project_id: projectId,
+        event_id: eventId,
+        is_done: true,
+        completed_at: new Date().toISOString(),
+      },
+      { onConflict: "project_id,event_id" },
+    );
+  } else {
+    await supabase
+      .from("meeting_completions")
+      .delete()
+      .eq("project_id", projectId)
+      .eq("event_id", eventId);
+  }
+  return { ok: true };
+}
+
 export async function disconnectCalendar(projectId: string) {
   const userId = await requireUser();
   await assertProjectOwnership(userId, projectId);

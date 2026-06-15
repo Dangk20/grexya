@@ -59,6 +59,7 @@ export type Task = {
   assignee_id: string | null;
   priority: Priority | null;
   front: Front | null;
+  start_date: string | null;
   due_date: string | null;
   eisenhower: Eisenhower | null;
   day_date: string | null;

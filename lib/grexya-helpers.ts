@@ -55,6 +55,32 @@ export function isMeeting(t: Task) {
   return t.eisenhower === "reunion";
 }
 
+/**
+ * ¿La tarea está programada para `dayISO` (YYYY-MM-DD)? Modelo ventana inicio→plazo:
+ * - Con inicio y plazo: aparece cada día entre ambos (inclusive).
+ * - Solo plazo (sin inicio): aparece únicamente el día del plazo.
+ * - Solo inicio (sin plazo): aparece desde el inicio en adelante.
+ * - Sin fechas: aparece en "hoy".
+ * - Vencida y sin terminar: se arrastra a "hoy" para que no desaparezca.
+ */
+export function isScheduledForDay(t: Task, dayISO: string, today: string = todayISO()): boolean {
+  const start = t.start_date;
+  const due = t.due_date;
+  const isToday = dayISO === today;
+  // Marcada como Top 3 de este día → override explícito, siempre visible
+  if (t.is_top3 && t.day_date === dayISO) return true;
+  // Sin programar → siempre hoy
+  if (!start && !due) return isToday;
+  // Vencida sin terminar → se arrastra a hoy
+  if (due && due < today && !t.is_done && isToday) return true;
+  // Solo plazo (sin inicio): únicamente el día del plazo
+  if (!start && due) return dayISO === due;
+  // Con inicio (con o sin plazo): ventana
+  const afterStart = !start || dayISO >= start;
+  const beforeDue = !due || dayISO <= due;
+  return afterStart && beforeDue;
+}
+
 export type Quad = "ui" | "ni" | "un" | "nn";
 
 /** Prioridad unificada = cuadrante Eisenhower. Es el único eje de prioridad. */

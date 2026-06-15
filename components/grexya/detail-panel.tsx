@@ -295,10 +295,21 @@ export function DetailPanel({
                 {personFor(task.assignee_id, ctx).name}
               </span>
             </PropRow>
+            <PropRow icon="calendar" label="Inicio">
+              <input
+                type="date"
+                defaultValue={task.start_date ?? ""}
+                max={task.due_date ?? undefined}
+                onChange={(e) => onUpdate(task.id, { start_date: e.target.value || null })}
+                className="prop-plain"
+                style={{ background: "var(--field)", border: "none", borderRadius: 8, padding: "4px 8px", color: "var(--text)" }}
+              />
+            </PropRow>
             <PropRow icon="calendar" label="Plazo">
               <input
                 type="date"
                 defaultValue={task.due_date ?? ""}
+                min={task.start_date ?? undefined}
                 onChange={(e) => onUpdate(task.id, { due_date: e.target.value || null })}
                 className="prop-plain"
                 style={{ background: "var(--field)", border: "none", borderRadius: 8, padding: "4px 8px", color: "var(--text)" }}

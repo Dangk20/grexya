@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/grexya/icon";
 import { Avatar, Check, PriorityChip, SubCounter } from "@/components/grexya/atoms";
-import { isMeeting, localISO, quadOf, QUAD_META, type Quad } from "@/lib/grexya-helpers";
-import { getMeetings, createMeeting } from "@/app/actions/calendar";
+import { isMeeting, isScheduledForDay, localISO, quadOf, QUAD_META, type Quad } from "@/lib/grexya-helpers";
+import { getMeetings, createMeeting, toggleMeetingDone } from "@/app/actions/calendar";
 import type { Meeting } from "@/lib/google";
 import type { Project, Task } from "@/lib/types";
 import type { WorldHandlers } from "@/components/grexya/project-world";
@@ -200,15 +200,25 @@ export function DailyBoard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarConn.connected, project.id, dayISO]);
 
-  const open = tasks.filter((t) => !t.parent_task_id && !t.is_done);
-  const meetings = open
-    .filter((t) => isMeeting(t))
+  // Tareas del día seleccionado (ventana inicio→plazo); las completadas salen del tablero.
+  const open = tasks.filter(
+    (t) => !t.parent_task_id && !t.is_done && isScheduledForDay(t, dayISO),
+  );
+  // Reuniones de Grexya del día: incluye las ya hechas (con check), para verlas tachadas.
+  const meetings = tasks
+    .filter((t) => !t.parent_task_id && isMeeting(t) && isScheduledForDay(t, dayISO))
     .sort((a, b) => (a.meeting_time ?? "").localeCompare(b.meeting_time ?? ""));
   const board = open.filter((t) => !isMeeting(t));
 
   // Top 3 = etiqueta explícita, del día seleccionado
   const isTopForDay = (t: Task) => t.is_top3 && t.day_date === dayISO;
   const top3 = board.filter(isTopForDay).sort((a, b) => (a.top_rank ?? 9) - (b.top_rank ?? 9));
+
+  const toggleGMeeting = async (m: Meeting) => {
+    const next = !m.done;
+    setGmeetings((ms) => ms.map((x) => (x.id === m.id ? { ...x, done: next } : x)));
+    await toggleMeetingDone(project.id, m.id, next).catch(() => {});
+  };
 
   const star = async (t: Task) => {
     const willOn = !isTopForDay(t);
@@ -324,7 +334,7 @@ export function DailyBoard({
                 {list.length === 0 && <div className="quad-empty">Vacío</div>}
                 <QuadAdd
                   onAdd={(title) =>
-                    h.onCreateTask({ projectId: project.id, title, dayDate: dayISO, eisenhower: qid })
+                    h.onCreateTask({ projectId: project.id, title, start_date: dayISO, eisenhower: qid })
                   }
                 />
               </div>
@@ -347,13 +357,16 @@ export function DailyBoard({
           <div className="quad-tasks">
             {calendarConn.connected &&
               gmeetings.map((m) => (
-                <div
-                  key={m.id}
-                  className="meet-item"
-                  onClick={() => m.htmlLink && window.open(m.htmlLink, "_blank")}
-                >
+                <div key={m.id} className={`meet-item ${m.done ? "done" : ""}`}>
+                  <Check done={m.done} onClick={() => toggleGMeeting(m)} size={16} />
                   <span className="meet-time mono">{m.allDay ? "Día" : hm(m.start)}</span>
-                  <span className="meet-title">{m.title}</span>
+                  <span
+                    className="meet-title"
+                    style={{ cursor: m.htmlLink ? "pointer" : "default" }}
+                    onClick={() => m.htmlLink && window.open(m.htmlLink, "_blank")}
+                  >
+                    {m.title}
+                  </span>
                   {m.hangoutLink && (
                     <button
                       title="Unirse por Google Meet"
@@ -369,9 +382,16 @@ export function DailyBoard({
                 </div>
               ))}
             {meetings.map((t) => (
-              <div key={t.id} className="meet-item" onClick={() => h.onOpenTask(t.id)}>
+              <div key={t.id} className={`meet-item ${t.is_done ? "done" : ""}`}>
+                <Check done={t.is_done} onClick={() => h.onToggleTask(t.id)} size={16} />
                 <span className="meet-time mono">{t.meeting_time || "—"}</span>
-                <span className="meet-title">{t.title}</span>
+                <span
+                  className="meet-title"
+                  style={{ cursor: "pointer" }}
+                  onClick={() => h.onOpenTask(t.id)}
+                >
+                  {t.title}
+                </span>
                 <Avatar id={t.assignee_id} size={20} />
               </div>
             ))}
@@ -387,7 +407,13 @@ export function DailyBoard({
               <>
                 <QuadAdd
                   onAdd={(title) =>
-                    h.onCreateTask({ projectId: project.id, title, dayDate: dayISO, eisenhower: "reunion" })
+                    h.onCreateTask({
+                      projectId: project.id,
+                      title,
+                      start_date: dayISO,
+                      due_date: dayISO,
+                      eisenhower: "reunion",
+                    })
                   }
                 />
                 <a

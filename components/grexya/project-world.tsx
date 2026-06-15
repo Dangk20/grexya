@@ -34,6 +34,8 @@ export type WorldHandlers = {
     projectId: string;
     title: string;
     statusId?: string | null;
+    start_date?: string | null;
+    due_date?: string | null;
     dayDate?: string | null;
     eisenhower?: Task["eisenhower"];
   }) => void;

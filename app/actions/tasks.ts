@@ -46,6 +46,7 @@ export async function createTask(input: {
   statusId?: string | null;
   priority?: Priority | null;
   front?: Front | null;
+  start_date?: string | null;
   due_date?: string | null;
   eisenhower?: Eisenhower | null;
   dayDate?: string | null;
@@ -75,6 +76,7 @@ export async function createTask(input: {
     title,
     status_id: statusId,
     front: input.front ?? null,
+    start_date: input.start_date ?? null,
     due_date: input.due_date ?? null,
     // prioridad = cuadrante; por defecto "Alta" (no urgente · importante)
     eisenhower: input.eisenhower ?? "ni",
@@ -154,6 +156,7 @@ export async function updateTask(input: {
     status_id?: string | null;
     priority?: Priority | null;
     front?: Front | null;
+    start_date?: string | null;
     due_date?: string | null;
     eisenhower?: Eisenhower | null;
     day_date?: string | null;

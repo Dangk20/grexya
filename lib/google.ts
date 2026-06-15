@@ -20,6 +20,7 @@ export type Meeting = {
   hangoutLink: string | null;
   htmlLink: string | null;
   attendees: string[];
+  done: boolean; // marcada como "ya la tuve" (persistido localmente)
 };
 
 export function oauthClient(redirectUri?: string) {
@@ -91,7 +92,7 @@ export async function listProjectMeetings(
       orderBy: "startTime",
       maxResults: 50,
     });
-    return (data.items ?? []).map((e) => ({
+    const meetings: Meeting[] = (data.items ?? []).map((e) => ({
       id: e.id ?? "",
       title: e.summary ?? "(sin título)",
       start: e.start?.dateTime ?? e.start?.date ?? null,
@@ -100,7 +101,23 @@ export async function listProjectMeetings(
       hangoutLink: e.hangoutLink ?? null,
       htmlLink: e.htmlLink ?? null,
       attendees: (e.attendees ?? []).map((a) => a.email ?? "").filter(Boolean),
+      done: false,
     }));
+
+    // Marca las que ya se tuvieron (check persistido localmente)
+    const ids = meetings.map((m) => m.id).filter(Boolean);
+    if (ids.length) {
+      const sb = createAdminSupabaseClient();
+      const { data: comps } = await sb
+        .from("meeting_completions")
+        .select("event_id")
+        .eq("project_id", projectId)
+        .eq("is_done", true)
+        .in("event_id", ids);
+      const doneSet = new Set((comps ?? []).map((c) => c.event_id as string));
+      meetings.forEach((m) => (m.done = doneSet.has(m.id)));
+    }
+    return meetings;
   } catch {
     return [];
   }
