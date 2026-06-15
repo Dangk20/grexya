@@ -7,6 +7,7 @@ import { Check, PriorityChip } from "@/components/grexya/atoms";
 import { isMeeting, isScheduledForDay, localISO, QUAD_META, type Quad } from "@/lib/grexya-helpers";
 import { getMeetings } from "@/app/actions/calendar";
 import { submitPlanning, skipPlanning, type PlanItem } from "@/app/actions/planning";
+import { toggleTask, deleteTask } from "@/app/actions/tasks";
 import type { Meeting } from "@/lib/google";
 import type { Project, Task } from "@/lib/types";
 
@@ -26,6 +27,11 @@ function fmtDay(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   const s = d.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function shortDay(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  return d.toLocaleDateString("es-CO", { weekday: "short", day: "numeric", month: "short" });
 }
 
 function hm(iso: string | null) {
@@ -54,6 +60,8 @@ export function PlanningModal({
   const [input, setInput] = useState("");
   const [retroOpen, setRetroOpen] = useState(true);
   const [planOpen, setPlanOpen] = useState(true);
+  const [pendOpen, setPendOpen] = useState(true);
+  const [pendHandled, setPendHandled] = useState<Set<string>>(new Set());
   const [gRetro, setGRetro] = useState<Meeting[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -94,6 +102,28 @@ export function PlanningModal({
     };
   }, [tasks, dayISO]);
   const planCount = plan.tasks.length + plan.meetings.length;
+
+  // ---- Pendientes: sin terminar cuyo día objetivo ya pasó (propuesta para reorganizar) ----
+  const carried = useMemo(() => {
+    return tasks
+      .filter((t) => {
+        if (t.parent_task_id || t.is_done || pendHandled.has(t.id)) return false;
+        const target = t.due_date ?? t.start_date;
+        return target != null && target < dayISO;
+      })
+      .sort((a, b) => (a.due_date ?? a.start_date ?? "").localeCompare(b.due_date ?? b.start_date ?? ""));
+  }, [tasks, dayISO, pendHandled]);
+
+  const pendDone = async (id: string) => {
+    setPendHandled((s) => new Set(s).add(id));
+    await toggleTask({ taskId: id }).catch(() => {});
+    router.refresh();
+  };
+  const pendDelete = async (id: string) => {
+    setPendHandled((s) => new Set(s).add(id));
+    await deleteTask({ taskId: id }).catch(() => {});
+    router.refresh();
+  };
 
   useEffect(() => {
     if (!calendarConn.connected || !retro.day) return;
@@ -251,6 +281,35 @@ export function PlanningModal({
             </div>
           )}
         </div>
+
+        {/* ---- Pendientes de días anteriores (propuesta) ---- */}
+        {carried.length > 0 && (
+          <div className="plan-retro plan-pend">
+            <button className="plan-retro-head" onClick={() => setPendOpen((o) => !o)}>
+              <Icon name={pendOpen ? "chevDown" : "chevRight"} size={16} />
+              <span>Vienen de días anteriores · sin terminar</span>
+              <span className="plan-retro-count mono">{carried.length}</span>
+            </button>
+            {pendOpen && (
+              <div className="plan-retro-body">
+                <p className="faint" style={{ fontSize: 12.5, margin: "2px 2px 8px" }}>
+                  Propuesta: déjalas (siguen en hoy), márcalas hechas o elimínalas.
+                </p>
+                {carried.map((t) => (
+                  <div key={t.id} className="pend-row">
+                    <Check done={false} onClick={() => pendDone(t.id)} size={16} />
+                    <PriorityChip quad={t.eisenhower} />
+                    <span className="retro-title">{t.title}</span>
+                    <span className="pend-tag mono">↩ {shortDay(t.due_date ?? t.start_date!)}</span>
+                    <button className="icon-btn sm" title="Eliminar" onClick={() => pendDelete(t.id)} style={{ color: "#E5484D" }}>
+                      <Icon name="x" size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ---- Plan de hoy: lo que ya diligenciaste ---- */}
         {planCount > 0 && (
