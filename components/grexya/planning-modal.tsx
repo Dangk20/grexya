@@ -2,12 +2,22 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Icon } from "@/components/grexya/icon";
 import { Check, PriorityChip } from "@/components/grexya/atoms";
 import { isMeeting, isScheduledForDay, localISO, QUAD_META, type Quad } from "@/lib/grexya-helpers";
 import { getMeetings } from "@/app/actions/calendar";
 import { submitPlanning, skipPlanning, type PlanItem } from "@/app/actions/planning";
-import { toggleTask, deleteTask } from "@/app/actions/tasks";
+import { toggleTask, deleteTask, reorderTasks } from "@/app/actions/tasks";
 import type { Meeting } from "@/lib/google";
 import type { Project, Task } from "@/lib/types";
 
@@ -32,6 +42,59 @@ function fmtDay(iso: string): string {
 function shortDay(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   return d.toLocaleDateString("es-CO", { weekday: "short", day: "numeric", month: "short" });
+}
+
+/** Tarea del retro, arrastrable para fijar el orden del daily. */
+function RetroTask({
+  task,
+  subs,
+  open,
+  onToggleExpand,
+}: {
+  task: Task;
+  subs: Task[];
+  open: boolean;
+  onToggleExpand: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+  return (
+    <div
+      ref={setNodeRef}
+      className="retro-item"
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        ...(isDragging ? { background: "var(--hover)", borderRadius: 8, position: "relative", zIndex: 2 } : {}),
+      }}
+    >
+      <div className="retro-row">
+        <span
+          {...attributes}
+          {...listeners}
+          title="Arrastrar para ordenar"
+          style={{ cursor: "grab", color: "var(--text-3)", display: "flex", touchAction: "none" }}
+        >
+          <Icon name="grip" size={14} />
+        </span>
+        <Check done size={16} />
+        <span className="retro-title">{task.title}</span>
+        {subs.length > 0 && (
+          <button className="retro-subbtn" onClick={onToggleExpand}>
+            <Icon name={open ? "chevDown" : "chevRight"} size={13} />
+            {subs.filter((s) => s.is_done).length}/{subs.length}
+          </button>
+        )}
+      </div>
+      {open &&
+        subs.map((s) => (
+          <div key={s.id} className="retro-sub">
+            <Check done={s.is_done} size={14} />
+            <span className={s.is_done ? "retro-sub-done" : ""}>{s.title}</span>
+          </div>
+        ))}
+    </div>
+  );
 }
 
 function hm(iso: string | null) {
@@ -88,10 +151,40 @@ export function PlanningModal({
     const sameDay = doneTop.filter((t) => dayOf(t) === day);
     return {
       day,
-      tasks: sameDay.filter((t) => !isMeeting(t)),
+      tasks: sameDay.filter((t) => !isMeeting(t)).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
       meetings: sameDay.filter((t) => isMeeting(t)),
     };
   }, [tasks, dayISO]);
+
+  // Orden local del retro (para arrastrar y soltar el orden del daily)
+  const retroIds = retro.tasks.map((t) => t.id);
+  const retroKey = retroIds.slice().sort().join(",");
+  const [retroOrder, setRetroOrder] = useState<string[]>(retroIds);
+  const [retroOrderKey, setRetroOrderKey] = useState(retroKey);
+  if (retroOrderKey !== retroKey) {
+    setRetroOrderKey(retroKey);
+    setRetroOrder(retroIds);
+  }
+  const orderedRetro = retroOrder
+    .map((id) => retro.tasks.find((t) => t.id === id))
+    .filter(Boolean) as Task[];
+  const retroSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const onRetroDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const next = arrayMove(retroOrder, retroOrder.indexOf(String(active.id)), retroOrder.indexOf(String(over.id)));
+    setRetroOrder(next);
+    reorderTasks({ projectId: project.id, items: next.map((id, i) => ({ id, position: i })) })
+      .then(() => router.refresh())
+      .catch(() => {});
+  };
+  const toggleExpand = (id: string) =>
+    setExpanded((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
 
   // ---- Plan de hoy: lo que ya está agendado para dayISO (tareas + reuniones) ----
   const plan = useMemo(() => {
@@ -225,41 +318,19 @@ export function PlanningModal({
                   Sin actividad completada en días anteriores.
                 </p>
               )}
-              {retro.tasks.map((t) => {
-                const subs = subsOf(t.id);
-                const open = expanded.has(t.id);
-                return (
-                  <div key={t.id} className="retro-item">
-                    <div className="retro-row">
-                      <Check done size={16} />
-                      <span className="retro-title">{t.title}</span>
-                      {subs.length > 0 && (
-                        <button
-                          className="retro-subbtn"
-                          onClick={() =>
-                            setExpanded((s) => {
-                              const n = new Set(s);
-                              if (n.has(t.id)) n.delete(t.id);
-                              else n.add(t.id);
-                              return n;
-                            })
-                          }
-                        >
-                          <Icon name={open ? "chevDown" : "chevRight"} size={13} />
-                          {subs.filter((s) => s.is_done).length}/{subs.length}
-                        </button>
-                      )}
-                    </div>
-                    {open &&
-                      subs.map((s) => (
-                        <div key={s.id} className="retro-sub">
-                          <Check done={s.is_done} size={14} />
-                          <span className={s.is_done ? "retro-sub-done" : ""}>{s.title}</span>
-                        </div>
-                      ))}
-                  </div>
-                );
-              })}
+              <DndContext sensors={retroSensors} collisionDetection={closestCenter} onDragEnd={onRetroDragEnd}>
+                <SortableContext items={retroOrder} strategy={verticalListSortingStrategy}>
+                  {orderedRetro.map((t) => (
+                    <RetroTask
+                      key={t.id}
+                      task={t}
+                      subs={subsOf(t.id)}
+                      open={expanded.has(t.id)}
+                      onToggleExpand={() => toggleExpand(t.id)}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
               {(retro.meetings.length > 0 || gRetro.length > 0) && (
                 <div className="retro-sec-label">Reuniones</div>
               )}
