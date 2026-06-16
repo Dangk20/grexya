@@ -18,6 +18,7 @@ import { isMeeting, isScheduledForDay, localISO, QUAD_META, type Quad } from "@/
 import { getMeetings } from "@/app/actions/calendar";
 import { submitPlanning, skipPlanning, type PlanItem } from "@/app/actions/planning";
 import { toggleTask, deleteTask, reorderTasks } from "@/app/actions/tasks";
+import { getDailyHidden, hideDailyItem, unhideDailyItem } from "@/app/actions/daily";
 import type { Meeting } from "@/lib/google";
 import type { Project, Task } from "@/lib/types";
 
@@ -234,15 +235,29 @@ export function PlanningModal({
     [retro.meetings, gRetro],
   );
 
-  // Ocultar ítems del retro (para no leerlos en el daily) — local a la sesión
+  // Ocultar ítems del retro (para no leerlos en el daily) — persistido por proyecto
   const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const hide = (id: string) => setHidden((s) => new Set(s).add(id));
-  const unhide = (id: string) =>
+  useEffect(() => {
+    let active = true;
+    getDailyHidden(project.id)
+      .then((ids) => active && setHidden(new Set(ids)))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [project.id]);
+  const hide = (id: string) => {
+    setHidden((s) => new Set(s).add(id));
+    hideDailyItem(project.id, id).catch(() => {});
+  };
+  const unhide = (id: string) => {
     setHidden((s) => {
       const n = new Set(s);
       n.delete(id);
       return n;
     });
+    unhideDailyItem(project.id, id).catch(() => {});
+  };
 
   // Orden de los bloques del retro (Reuniones primero por defecto)
   const [blockOrder, setBlockOrder] = useState<("reuniones" | "tareas")[]>(["reuniones", "tareas"]);
