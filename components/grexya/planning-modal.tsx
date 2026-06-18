@@ -490,6 +490,7 @@ export function PlanningModal({
           )}
         </div>
 
+        <div className="planning-scroll">
         {/* ---- Retro: ¿qué hiciste? ---- */}
         <div className="plan-retro">
           <button className="plan-retro-head" onClick={() => setRetroOpen((o) => !o)}>
@@ -783,6 +784,7 @@ export function PlanningModal({
               </div>
             </>
           )}
+        </div>
         </div>
 
         {err && (
