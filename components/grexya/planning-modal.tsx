@@ -137,6 +137,60 @@ function RetroBlock({ id, label, count, children }: { id: string; label: string;
   );
 }
 
+/** Tarea del plan de hoy, arrastrable para ordenar el daily. */
+function PlanTask({
+  task,
+  subs,
+  open,
+  onToggleExpand,
+}: {
+  task: Task;
+  subs: Task[];
+  open: boolean;
+  onToggleExpand: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+  return (
+    <div
+      ref={setNodeRef}
+      className="retro-item"
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        ...(isDragging ? { background: "var(--hover)", borderRadius: 8, position: "relative", zIndex: 2 } : {}),
+      }}
+    >
+      <div className="retro-row">
+        <span
+          {...attributes}
+          {...listeners}
+          title="Arrastrar para ordenar"
+          style={{ cursor: "grab", color: "var(--text-3)", display: "flex", touchAction: "none" }}
+        >
+          <Icon name="grip" size={14} />
+        </span>
+        <Check done={task.is_done} size={16} />
+        <PriorityChip quad={task.eisenhower} />
+        <span className={`retro-title ${task.is_done ? "retro-sub-done" : ""}`}>{task.title}</span>
+        {subs.length > 0 && (
+          <button className="retro-subbtn" onClick={onToggleExpand}>
+            <Icon name={open ? "chevDown" : "chevRight"} size={13} />
+            {subs.filter((s) => s.is_done).length}/{subs.length}
+          </button>
+        )}
+      </div>
+      {open &&
+        subs.map((s) => (
+          <div key={s.id} className="retro-sub">
+            <Check done={s.is_done} size={14} />
+            <span className={s.is_done ? "retro-sub-done" : ""}>{s.title}</span>
+          </div>
+        ))}
+    </div>
+  );
+}
+
 function hm(iso: string | null) {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
@@ -166,6 +220,7 @@ export function PlanningModal({
   const [pendOpen, setPendOpen] = useState(true);
   const [pendHandled, setPendHandled] = useState<Set<string>>(new Set());
   const [gRetro, setGRetro] = useState<Meeting[]>([]);
+  const [gToday, setGToday] = useState<Meeting[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -218,6 +273,7 @@ export function PlanningModal({
       .then(() => router.refresh())
       .catch(() => {});
   };
+
   const toggleExpand = (id: string) =>
     setExpanded((s) => {
       const n = new Set(s);
@@ -278,11 +334,43 @@ export function PlanningModal({
   const plan = useMemo(() => {
     const all = tasks.filter((t) => !t.parent_task_id && isScheduledForDay(t, dayISO));
     return {
-      tasks: all.filter((t) => !isMeeting(t)).sort((a, b) => Number(a.is_done) - Number(b.is_done)),
+      tasks: all.filter((t) => !isMeeting(t)).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
       meetings: all.filter((t) => isMeeting(t)),
     };
   }, [tasks, dayISO]);
-  const planCount = plan.tasks.length + plan.meetings.length;
+  const planCount = plan.tasks.length + plan.meetings.length + gToday.length;
+
+  // Orden local del plan de hoy (para arrastrar y soltar el orden del daily)
+  const planIds = plan.tasks.map((t) => t.id);
+  const planKey = planIds.slice().sort().join(",");
+  const [planOrder, setPlanOrder] = useState<string[]>(planIds);
+  const [planOrderKey, setPlanOrderKey] = useState(planKey);
+  if (planOrderKey !== planKey) {
+    setPlanOrderKey(planKey);
+    setPlanOrder(planIds);
+  }
+  const orderedPlan = planOrder
+    .map((id) => plan.tasks.find((t) => t.id === id))
+    .filter(Boolean) as Task[];
+  const planSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const onPlanDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const next = arrayMove(planOrder, planOrder.indexOf(String(active.id)), planOrder.indexOf(String(over.id)));
+    setPlanOrder(next);
+    reorderTasks({ projectId: project.id, items: next.map((id, i) => ({ id, position: i })) })
+      .then(() => router.refresh())
+      .catch(() => {});
+  };
+
+  // Reuniones de hoy (del sistema + Google) unificadas, para el plan del día
+  const planMeetings = useMemo(
+    () => [
+      ...plan.meetings.map((t) => ({ id: t.id, time: t.meeting_time || "—", title: t.title, done: t.is_done })),
+      ...gToday.map((m) => ({ id: m.id, time: m.allDay ? "Día" : hm(m.start), title: m.title, done: m.done })),
+    ],
+    [plan.meetings, gToday],
+  );
 
   // ---- Pendientes: sin terminar cuyo día objetivo ya pasó (propuesta para reorganizar) ----
   const carried = useMemo(() => {
@@ -316,6 +404,18 @@ export function PlanningModal({
       active = false;
     };
   }, [calendarConn.connected, retro.day, project.id]);
+
+  // Reuniones de hoy (Google) — para repasarlas antes del daily y poder ocultarlas
+  useEffect(() => {
+    if (!calendarConn.connected) return;
+    let active = true;
+    getMeetings(project.id, dayISO)
+      .then((m) => active && setGToday(m))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [calendarConn.connected, dayISO, project.id]);
 
   const subsOf = (id: string) => tasks.filter((t) => t.parent_task_id === id);
   const topCount = drafts.filter((d) => d.kind === "task" && d.top3).length;
@@ -518,40 +618,50 @@ export function PlanningModal({
             </button>
             {planOpen && (
               <div className="plan-retro-body">
-                {plan.tasks.map((t) => {
-                  const subs = subsOf(t.id);
-                  const open = expanded.has(t.id);
-                  return (
-                    <div key={t.id} className="retro-item">
-                      <div className="retro-row">
-                        <Check done={t.is_done} size={16} />
-                        <PriorityChip quad={t.eisenhower} />
-                        <span className={`retro-title ${t.is_done ? "retro-sub-done" : ""}`}>{t.title}</span>
-                        {subs.length > 0 && (
-                          <button className="retro-subbtn" onClick={() => toggleExpand(t.id)}>
-                            <Icon name={open ? "chevDown" : "chevRight"} size={13} />
-                            {subs.filter((s) => s.is_done).length}/{subs.length}
-                          </button>
-                        )}
-                      </div>
-                      {open &&
-                        subs.map((s) => (
-                          <div key={s.id} className="retro-sub">
-                            <Check done={s.is_done} size={14} />
-                            <span className={s.is_done ? "retro-sub-done" : ""}>{s.title}</span>
-                          </div>
-                        ))}
+                <DndContext sensors={planSensors} collisionDetection={closestCenter} onDragEnd={onPlanDragEnd}>
+                  <SortableContext items={orderedPlan.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                    {orderedPlan.map((t) => (
+                      <PlanTask
+                        key={t.id}
+                        task={t}
+                        subs={subsOf(t.id)}
+                        open={expanded.has(t.id)}
+                        onToggleExpand={() => toggleExpand(t.id)}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+                {planMeetings.some((m) => !hidden.has(m.id)) && <div className="retro-sec-label">Reuniones</div>}
+                {planMeetings
+                  .filter((m) => !hidden.has(m.id))
+                  .map((m) => (
+                    <div key={m.id} className="retro-row">
+                      <Check done={m.done} size={16} />
+                      <span className="retro-time mono">{m.time}</span>
+                      <span className={`retro-title ${m.done ? "retro-sub-done" : ""}`}>{m.title}</span>
+                      <button className="retro-hide" title="Ocultar del daily" onClick={() => hide(m.id)}>
+                        <Icon name="eyeOff" size={14} />
+                      </button>
                     </div>
-                  );
-                })}
-                {plan.meetings.length > 0 && <div className="retro-sec-label">Reuniones</div>}
-                {plan.meetings.map((t) => (
-                  <div key={t.id} className="retro-row">
-                    <Check done={t.is_done} size={16} />
-                    <span className="retro-time mono">{t.meeting_time || "—"}</span>
-                    <span className={`retro-title ${t.is_done ? "retro-sub-done" : ""}`}>{t.title}</span>
+                  ))}
+                {planMeetings.some((m) => hidden.has(m.id)) && (
+                  <div className="retro-hidden">
+                    <div className="retro-sec-label" style={{ marginTop: 10 }}>
+                      Ocultas del daily · {planMeetings.filter((m) => hidden.has(m.id)).length}
+                    </div>
+                    {planMeetings
+                      .filter((m) => hidden.has(m.id))
+                      .map((m) => (
+                        <div key={m.id} className="retro-row hidden-row">
+                          <span className="retro-time mono">{m.time}</span>
+                          <span className="retro-title">{m.title}</span>
+                          <button className="retro-hide" title="Volver a mostrar" onClick={() => unhide(m.id)}>
+                            <Icon name="eye" size={14} />
+                          </button>
+                        </div>
+                      ))}
                   </div>
-                ))}
+                )}
               </div>
             )}
           </div>
