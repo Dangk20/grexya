@@ -303,6 +303,7 @@ export function AppShell({
               onToggleTask={toggleTask}
               onOpenProject={(id) => nav("project", id)}
               onNewProject={() => setNewProjOpen(true)}
+              onReorderTasks={reorderTasks}
               connectedProjectIds={calendars.map((c) => c.project_id)}
             />
           )}

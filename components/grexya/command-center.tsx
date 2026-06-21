@@ -1,6 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Icon } from "@/components/grexya/icon";
 import {
   Avatar,
@@ -65,18 +80,80 @@ function ProjectCard({
   );
 }
 
+/** Fila de tarea arrastrable de la vista de inicio. */
+function SortableTaskRow({
+  task,
+  project,
+  all,
+  onOpenTask,
+  onToggleTask,
+  onSetFilter,
+}: {
+  task: Task;
+  project: Project | undefined;
+  all: Task[];
+  onOpenTask: (id: string) => void;
+  onToggleTask: (id: string) => void;
+  onSetFilter: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id,
+  });
+  const done = task.is_done;
+  return (
+    <div
+      ref={setNodeRef}
+      className={`trow tbl-row ${done ? "done" : ""}`}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        cursor: "grab",
+        ...(isDragging ? { opacity: 0.5, position: "relative", zIndex: 2, background: "var(--hover)" } : {}),
+      }}
+      onClick={() => onOpenTask(task.id)}
+      {...attributes}
+      {...listeners}
+    >
+      <Check done={done} onClick={() => onToggleTask(task.id)} />
+      <span className="tcell-task">
+        <span className="ttitle">{task.title}</span>
+        <SubCounter task={task} all={all} />
+      </span>
+      <span>
+        {project && (
+          <ProjectChip
+            project={project}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSetFilter(task.project_id);
+            }}
+          />
+        )}
+      </span>
+      <span>
+        <PriorityChip quad={task.eisenhower} />
+      </span>
+      <span style={{ display: "flex", justifyContent: "center" }}>
+        <Avatar id={task.assignee_id} size={26} />
+      </span>
+    </div>
+  );
+}
+
 function TasksPanel({
   tasks,
   projects,
   projectById,
   onOpenTask,
   onToggleTask,
+  onReorderTasks,
 }: {
   tasks: Task[];
   projects: Project[];
   projectById: Map<string, Project>;
   onOpenTask: (id: string) => void;
   onToggleTask: (id: string) => void;
+  onReorderTasks: (projectId: string, items: { id: string; position: number }[]) => void;
 }) {
   const [filter, setFilter] = useState<string>("all");
   const [hideDone, setHideDone] = useState(true);
@@ -105,9 +182,33 @@ function TasksPanel({
       const ad = a.is_done ? 1 : 0;
       const bd = b.is_done ? 1 : 0;
       if (ad !== bd) return ad - bd;
+      const pd = (a.position ?? 0) - (b.position ?? 0);
+      if (pd !== 0) return pd;
       return QUAD_RANK[quadOf(a)] - QUAD_RANK[quadOf(b)];
     });
   }, [today, filter, hideDone]);
+
+  // Arrastrar y soltar para ordenar manualmente la lista de hoy.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const onDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const ids = rows.map((t) => t.id);
+    const from = ids.indexOf(String(active.id));
+    const to = ids.indexOf(String(over.id));
+    if (from < 0 || to < 0) return;
+    const next = arrayMove(ids, from, to);
+    // posición global secuencial → preserva el orden aunque se mezclen proyectos
+    const byProject = new Map<string, { id: string; position: number }[]>();
+    next.forEach((id, i) => {
+      const t = today.find((x) => x.id === id);
+      if (!t) return;
+      const arr = byProject.get(t.project_id) ?? [];
+      arr.push({ id, position: i });
+      byProject.set(t.project_id, arr);
+    });
+    byProject.forEach((items, projectId) => onReorderTasks(projectId, items));
+  };
 
   const cur = filter === "all" ? null : projectById.get(filter);
 
@@ -207,40 +308,21 @@ function TasksPanel({
         </div>
       </div>
       <div className="tbl">
-        {rows.map((t) => {
-          const done = t.is_done;
-          const p = projectById.get(t.project_id);
-          return (
-            <div
-              key={t.id}
-              className={`trow tbl-row ${done ? "done" : ""}`}
-              onClick={() => onOpenTask(t.id)}
-            >
-              <Check done={done} onClick={() => onToggleTask(t.id)} />
-              <span className="tcell-task">
-                <span className="ttitle">{t.title}</span>
-                <SubCounter task={t} all={tasks} />
-              </span>
-              <span>
-                {p && (
-                  <ProjectChip
-                    project={p}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setFilter(t.project_id);
-                    }}
-                  />
-                )}
-              </span>
-              <span>
-                <PriorityChip quad={t.eisenhower} />
-              </span>
-              <span style={{ display: "flex", justifyContent: "center" }}>
-                <Avatar id={t.assignee_id} size={26} />
-              </span>
-            </div>
-          );
-        })}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={rows.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+            {rows.map((t) => (
+              <SortableTaskRow
+                key={t.id}
+                task={t}
+                project={projectById.get(t.project_id)}
+                all={tasks}
+                onOpenTask={onOpenTask}
+                onToggleTask={onToggleTask}
+                onSetFilter={setFilter}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
         {rows.length === 0 && (
           <div className="tbl-empty">
             <Icon name="check" size={20} className="faint" />
@@ -435,6 +517,7 @@ export function CommandCenter({
   onToggleTask,
   onOpenProject,
   onNewProject,
+  onReorderTasks,
   connectedProjectIds,
 }: {
   projects: Project[];
@@ -444,6 +527,7 @@ export function CommandCenter({
   onToggleTask: (id: string) => void;
   onOpenProject: (id: string) => void;
   onNewProject: () => void;
+  onReorderTasks: (projectId: string, items: { id: string; position: number }[]) => void;
   connectedProjectIds: string[];
 }) {
   const projectById = useMemo(
@@ -497,6 +581,7 @@ export function CommandCenter({
           projectById={projectById}
           onOpenTask={onOpenTask}
           onToggleTask={onToggleTask}
+          onReorderTasks={onReorderTasks}
         />
         <MeetingsPanel
           tasks={tasks}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -196,6 +196,15 @@ export function DetailPanel({
   const [desc, setDesc] = useState(task.description ?? "");
   const [newSub, setNewSub] = useState("");
   const [topMsg, setTopMsg] = useState<string | null>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+
+  // El título crece con su contenido (no se corta en una línea).
+  useEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [title]);
 
   const close = () => {
     setClosing(true);
@@ -273,12 +282,13 @@ export function DetailPanel({
           <div className="so-titlerow">
             <Check done={isDone} onClick={() => onToggle(task.id)} size={24} />
             <textarea
+              ref={titleRef}
               className={`so-title ${isDone ? "done" : ""}`}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onBlur={() => title.trim() && title !== task.title && onUpdate(task.id, { title: title.trim() })}
               rows={1}
-              style={{ background: "none", border: "none", resize: "none" }}
+              style={{ background: "none", border: "none", resize: "none", overflow: "hidden" }}
             />
           </div>
 
