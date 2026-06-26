@@ -241,33 +241,16 @@ export function PlanningModal({
   }, [blocking, onClose]);
 
   // ---- Retro: último día con actividad (tareas/reuniones completadas) antes de dayISO ----
-  // Incluye además las tareas ATRASADAS que se completan hoy mismo (su día objetivo
-  // ya pasó): aunque su completed_at sea de hoy, son cosas que reportas en este daily,
-  // así que "suben" a la sección "¿Qué hiciste…?".
+  // Las tareas atrasadas cerradas desde este modal se fechan en el día del retro
+  // (ver pendDone), por eso "suben" aquí. Completarlas desde la vista normal las
+  // fecha en el día real, así que NO aparecen en el retro de hoy.
   const retro = useMemo(() => {
     const doneTop = tasks.filter((t) => !t.parent_task_id && t.is_done && t.completed_at);
     const dayOf = (t: Task) => localISO(new Date(t.completed_at!));
     const days = doneTop.map(dayOf).filter((d) => d < dayISO);
-    // Atrasadas completadas hoy: due/start en el pasado pero completadas el día del modal.
-    const overdueDoneToday = doneTop.filter((t) => {
-      if (dayOf(t) !== dayISO) return false;
-      const sched = t.due_date ?? t.start_date;
-      return sched != null && sched < dayISO;
-    });
-    if (!days.length && !overdueDoneToday.length)
-      return { day: null as string | null, tasks: [] as Task[], meetings: [] as Task[] };
-    // Día de cabecera: el último día con actividad; si no hay, el último día objetivo de las atrasadas.
-    const day =
-      days.length
-        ? days.sort().at(-1)!
-        : overdueDoneToday
-            .map((t) => (t.due_date ?? t.start_date)!)
-            .sort()
-            .at(-1)!;
-    const onDay = days.length ? doneTop.filter((t) => dayOf(t) === day) : [];
-    // Unir sin duplicar (onDay y overdueDoneToday son disjuntos por completed_at, pero por seguridad).
-    const seen = new Set(onDay.map((t) => t.id));
-    const sameDay = [...onDay, ...overdueDoneToday.filter((t) => !seen.has(t.id))];
+    if (!days.length) return { day: null as string | null, tasks: [] as Task[], meetings: [] as Task[] };
+    const day = days.sort().at(-1)!;
+    const sameDay = doneTop.filter((t) => dayOf(t) === day);
     return {
       day,
       tasks: sameDay.filter((t) => !isMeeting(t)).sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
@@ -407,9 +390,14 @@ export function PlanningModal({
       .sort((a, b) => (a.due_date ?? a.start_date ?? "").localeCompare(b.due_date ?? b.start_date ?? ""));
   }, [tasks, dayISO, pendHandled]);
 
-  const pendDone = async (id: string) => {
-    setPendHandled((s) => new Set(s).add(id));
-    await toggleTask({ taskId: id }).catch(() => {});
+  // Cerrar una atrasada desde el modal: se fecha en el día del retro que se reporta
+  // (si aún no hay retro, en el propio día objetivo de la tarea). Mediodía local para
+  // evitar saltos de día por zona horaria. Así "sube" a "¿Qué hiciste…?".
+  const pendDone = async (t: Task) => {
+    setPendHandled((s) => new Set(s).add(t.id));
+    const reportDay = retro.day ?? t.due_date ?? t.start_date ?? null;
+    const completedAt = reportDay ? new Date(`${reportDay}T12:00:00`).toISOString() : undefined;
+    await toggleTask({ taskId: t.id, completedAt }).catch(() => {});
     router.refresh();
   };
 
@@ -630,7 +618,7 @@ export function PlanningModal({
                 </p>
                 {carried.map((t) => (
                   <div key={t.id} className="pend-row">
-                    <Check done={false} onClick={() => pendDone(t.id)} size={16} />
+                    <Check done={false} onClick={() => pendDone(t)} size={16} />
                     <PriorityChip quad={t.eisenhower} />
                     <span className="retro-title">{t.title}</span>
                     <span className="pend-tag mono">↩ {shortDay(t.due_date ?? t.start_date!)}</span>

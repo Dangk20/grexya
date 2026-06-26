@@ -132,15 +132,21 @@ export async function setTaskTop3(input: {
   return { ok: true };
 }
 
-/** Alterna el completado (independiente de la columna). */
-export async function toggleTask(input: { taskId: string }) {
+/**
+ * Alterna el completado (independiente de la columna).
+ * `completedAt` permite fechar la completitud en un día distinto a hoy
+ * (p. ej. al cerrar una tarea atrasada desde el modal de Planning, se
+ * registra en el día del retro que se reporta). Solo aplica al marcar hecha.
+ */
+export async function toggleTask(input: { taskId: string; completedAt?: string }) {
   const userId = await requireUser();
   const task = await assertTaskOwnership(userId, input.taskId);
   const next = !task.is_done;
+  const completedAt = next ? input.completedAt ?? new Date().toISOString() : null;
   const supabase = createAdminSupabaseClient();
   const { data: updated } = await supabase
     .from("tasks")
-    .update({ is_done: next, completed_at: next ? new Date().toISOString() : null })
+    .update({ is_done: next, completed_at: completedAt })
     .eq("id", input.taskId)
     .select("*")
     .single();
