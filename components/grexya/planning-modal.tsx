@@ -142,11 +142,15 @@ function PlanTask({
   task,
   subs,
   open,
+  done,
+  onToggle,
   onToggleExpand,
 }: {
   task: Task;
   subs: Task[];
   open: boolean;
+  done: boolean;
+  onToggle: () => void;
   onToggleExpand: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
@@ -170,9 +174,9 @@ function PlanTask({
         >
           <Icon name="grip" size={14} />
         </span>
-        <Check done={task.is_done} size={16} />
+        <Check done={done} onClick={onToggle} size={16} />
         <PriorityChip quad={task.eisenhower} />
-        <span className={`retro-title ${task.is_done ? "retro-sub-done" : ""}`}>{task.title}</span>
+        <span className={`retro-title ${done ? "retro-sub-done" : ""}`}>{task.title}</span>
         {subs.length > 0 && (
           <button className="retro-subbtn" onClick={onToggleExpand}>
             <Icon name={open ? "chevDown" : "chevRight"} size={13} />
@@ -386,6 +390,17 @@ export function PlanningModal({
   const pendDone = async (id: string) => {
     setPendHandled((s) => new Set(s).add(id));
     await toggleTask({ taskId: id }).catch(() => {});
+    router.refresh();
+  };
+
+  // Completar tareas desde el plan de hoy → quedan con completed_at = hoy,
+  // así aparecen mañana en el retro "¿Qué hiciste…?". Optimista hasta el refresh.
+  const [planDone, setPlanDone] = useState<Map<string, boolean>>(new Map());
+  const isPlanDone = (t: Task) => (planDone.has(t.id) ? planDone.get(t.id)! : t.is_done);
+  const planToggle = async (t: Task) => {
+    const next = !isPlanDone(t);
+    setPlanDone((m) => new Map(m).set(t.id, next));
+    await toggleTask({ taskId: t.id }).catch(() => {});
     router.refresh();
   };
   const pendDelete = async (id: string) => {
@@ -627,6 +642,8 @@ export function PlanningModal({
                         task={t}
                         subs={subsOf(t.id)}
                         open={expanded.has(t.id)}
+                        done={isPlanDone(t)}
+                        onToggle={() => planToggle(t)}
                         onToggleExpand={() => toggleExpand(t.id)}
                       />
                     ))}
