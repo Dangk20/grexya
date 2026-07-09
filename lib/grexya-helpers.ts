@@ -1,4 +1,4 @@
-import type { Project, Task } from "@/lib/types";
+import type { Project, Recurrence, Task } from "@/lib/types";
 
 export const WD = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
 
@@ -72,6 +72,43 @@ export function isScheduledForDay(t: Task, dayISO: string, today: string = today
   if (start && due) return dayISO >= start && dayISO <= due;
   // Solo uno de los dos (inicio o plazo) → ese día específico
   return dayISO === targetDay;
+}
+
+// ---------- Recurrencia ----------
+
+export const RECURRENCE_META: Record<Recurrence, { label: string; hint: string }> = {
+  daily: { label: "Todos los días", hint: "Al completarla, reaparece mañana." },
+  weekdays: { label: "Días hábiles (L–V)", hint: "Al completarla, reaparece el siguiente día hábil." },
+  weekly: { label: "Cada semana", hint: "Al completarla, reaparece el mismo día de la próxima semana." },
+};
+
+/** Suma días a una fecha YYYY-MM-DD (aritmética en UTC: sin saltos por zona horaria). */
+export function addDays(iso: string, days: number): string {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Día de la semana (0=dom … 6=sáb) de una fecha YYYY-MM-DD. */
+function weekdayOf(iso: string): number {
+  return new Date(iso + "T00:00:00Z").getUTCDay();
+}
+
+/**
+ * Próxima fecha de la serie: la primera posterior a `today` a partir de `base`
+ * (el día en que la tarea estaba programada). Así una tarea semanal completada
+ * con retraso vuelve a caer en su mismo día de la semana.
+ */
+export function nextOccurrence(rec: Recurrence, base: string, today: string): string {
+  // Diaria/hábiles: no tiene sentido arrastrar el ancla vieja, se cuenta desde hoy.
+  // Semanal: se cuenta desde el ancla para conservar el día de la semana.
+  const step = rec === "weekly" ? 7 : 1;
+  let next = addDays(rec !== "weekly" && base < today ? today : base, step);
+  while (next <= today) next = addDays(next, step);
+  if (rec === "weekdays") {
+    while (weekdayOf(next) === 0 || weekdayOf(next) === 6) next = addDays(next, 1);
+  }
+  return next;
 }
 
 export type Quad = "ui" | "ni" | "un" | "nn";

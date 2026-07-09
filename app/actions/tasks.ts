@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getOrCreateWorkspace } from "@/lib/data";
 import { notionSyncArchive, notionSyncCreate, notionSyncUpdate } from "@/lib/notion-sync";
-import type { Eisenhower, Front, Priority, Task } from "@/lib/types";
+import { addDays, nextOccurrence } from "@/lib/grexya-helpers";
+import type { Eisenhower, Front, Priority, Recurrence, Task } from "@/lib/types";
 
 async function requireUser() {
   const { userId } = await auth();
@@ -132,18 +133,131 @@ export async function setTaskTop3(input: {
   return { ok: true };
 }
 
+/** Diferencia en días entre dos fechas YYYY-MM-DD. */
+function daysBetween(from: string, to: string): number {
+  return Math.round(
+    (new Date(to + "T00:00:00Z").getTime() - new Date(from + "T00:00:00Z").getTime()) / 86400000,
+  );
+}
+
+/**
+ * Al completar una tarea recurrente, la clona (con sus subtareas sin marcar)
+ * para la siguiente fecha de la serie. `recurrence_from_id` evita duplicarla si
+ * se marca y desmarca varias veces.
+ */
+async function spawnNextOccurrence(userId: string, task: Task, today: string) {
+  if (!task.recurrence || task.parent_task_id) return;
+  const supabase = createAdminSupabaseClient();
+
+  const { data: already } = await supabase
+    .from("tasks")
+    .select("id")
+    .eq("recurrence_from_id", task.id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (already) return;
+
+  // Ancla de la serie: el día para el que estaba programada esta ocurrencia.
+  const base = task.start_date ?? task.due_date ?? today;
+  const next = nextOccurrence(task.recurrence, base, today);
+  const shift = daysBetween(base, next);
+
+  // La copia arranca en la primera columna del tablero, no donde quedó la anterior.
+  const { data: firstStatus } = await supabase
+    .from("project_statuses")
+    .select("id")
+    .eq("project_id", task.project_id)
+    .order("position", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: clone } = await supabase
+    .from("tasks")
+    .insert({
+      project_id: task.project_id,
+      title: task.title,
+      description: task.description,
+      status_id: firstStatus?.id ?? null,
+      assignee_id: task.assignee_id ?? userId,
+      priority: task.priority,
+      front: task.front,
+      eisenhower: task.eisenhower,
+      meeting_time: task.meeting_time,
+      start_date: next,
+      due_date: task.due_date ? addDays(task.due_date, shift) : null,
+      recurrence: task.recurrence,
+      recurrence_from_id: task.id,
+      position: Date.now(),
+    })
+    .select("*")
+    .single();
+  if (!clone) return;
+
+  const { data: subs } = await supabase
+    .from("tasks")
+    .select("title, description, position")
+    .eq("parent_task_id", task.id)
+    .is("deleted_at", null)
+    .order("position", { ascending: true });
+  if (subs?.length) {
+    await supabase.from("tasks").insert(
+      subs.map((s) => ({
+        project_id: task.project_id,
+        parent_task_id: clone.id,
+        title: s.title as string,
+        description: s.description as string | null,
+        status: "sin",
+        assignee_id: userId,
+        position: s.position as number,
+      })),
+    );
+  }
+
+  await notionSyncCreate(task.project_id, clone as Task);
+}
+
+/** Al desmarcar el completado, deshace la ocurrencia que se creó (si nadie la tocó). */
+async function unspawnNextOccurrence(taskId: string) {
+  const supabase = createAdminSupabaseClient();
+  const { data: clone } = await supabase
+    .from("tasks")
+    .select("id, project_id, is_done, notion_page_id")
+    .eq("recurrence_from_id", taskId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!clone || clone.is_done) return;
+
+  // Si ya hay progreso en sus subtareas, la copia se queda.
+  const { count } = await supabase
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("parent_task_id", clone.id)
+    .eq("is_done", true);
+  if (count) return;
+
+  if (clone.notion_page_id) {
+    await notionSyncArchive(clone.project_id as string, clone.notion_page_id as string, true);
+  }
+  await supabase.from("tasks").delete().eq("id", clone.id); // subtareas caen por cascade
+}
+
 /**
  * Alterna el completado (independiente de la columna).
  * `completedAt` permite fechar la completitud en un día distinto a hoy
  * (p. ej. al cerrar una tarea atrasada desde el modal de Planning, se
  * registra en el día del retro que se reporta). Solo aplica al marcar hecha.
+ * `today` es la fecha local del navegador: sin ella, el servidor (UTC) puede
+ * adelantar un día la próxima ocurrencia de una tarea recurrente.
  */
-export async function toggleTask(input: { taskId: string; completedAt?: string }) {
+export async function toggleTask(input: { taskId: string; completedAt?: string; today?: string }) {
   const userId = await requireUser();
-  const task = await assertTaskOwnership(userId, input.taskId);
+  await assertTaskOwnership(userId, input.taskId);
+  const supabase = createAdminSupabaseClient();
+  const { data: task } = await supabase.from("tasks").select("*").eq("id", input.taskId).single();
+  if (!task) throw new Error("Tarea no encontrada");
+
   const next = !task.is_done;
   const completedAt = next ? input.completedAt ?? new Date().toISOString() : null;
-  const supabase = createAdminSupabaseClient();
   const { data: updated } = await supabase
     .from("tasks")
     .update({ is_done: next, completed_at: completedAt })
@@ -151,6 +265,39 @@ export async function toggleTask(input: { taskId: string; completedAt?: string }
     .select("*")
     .single();
   if (updated) await notionSyncUpdate(updated as Task);
+
+  if (task.recurrence && !task.parent_task_id) {
+    const today = input.today ?? new Date().toISOString().slice(0, 10);
+    if (next) await spawnNextOccurrence(userId, task as Task, today);
+    else await unspawnNextOccurrence(input.taskId);
+  }
+
+  revalidate();
+}
+
+/**
+ * Define (o quita) la cadencia de una tarea recurrente.
+ * Si la tarea ya estaba completada, engendra la próxima ocurrencia de una vez;
+ * al quitar la cadencia, deshace la ocurrencia pendiente que nadie ha tocado.
+ */
+export async function setTaskRecurrence(input: {
+  taskId: string;
+  recurrence: Recurrence | null;
+  today: string;
+}) {
+  const userId = await requireUser();
+  await assertTaskOwnership(userId, input.taskId);
+  const supabase = createAdminSupabaseClient();
+  const { data: task } = await supabase.from("tasks").select("*").eq("id", input.taskId).single();
+  if (!task || task.parent_task_id) return;
+
+  await supabase.from("tasks").update({ recurrence: input.recurrence }).eq("id", input.taskId);
+
+  if (input.recurrence && task.is_done) {
+    await spawnNextOccurrence(userId, { ...task, recurrence: input.recurrence } as Task, input.today);
+  } else if (!input.recurrence) {
+    await unspawnNextOccurrence(input.taskId);
+  }
   revalidate();
 }
 

@@ -14,7 +14,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } 
 import { CSS } from "@dnd-kit/utilities";
 import { Icon } from "@/components/grexya/icon";
 import { Check, PriorityChip } from "@/components/grexya/atoms";
-import { isMeeting, isScheduledForDay, localISO, QUAD_META, type Quad } from "@/lib/grexya-helpers";
+import { isMeeting, isScheduledForDay, localISO, todayISO, QUAD_META, type Quad } from "@/lib/grexya-helpers";
 import { getMeetings } from "@/app/actions/calendar";
 import { submitPlanning, skipPlanning, type PlanItem } from "@/app/actions/planning";
 import { toggleTask, deleteTask, reorderTasks } from "@/app/actions/tasks";
@@ -397,7 +397,7 @@ export function PlanningModal({
     setPendHandled((s) => new Set(s).add(t.id));
     const reportDay = retro.day ?? t.due_date ?? t.start_date ?? null;
     const completedAt = reportDay ? new Date(`${reportDay}T12:00:00`).toISOString() : undefined;
-    await toggleTask({ taskId: t.id, completedAt }).catch(() => {});
+    await toggleTask({ taskId: t.id, completedAt, today: todayISO() }).catch(() => {});
     router.refresh();
   };
 
@@ -408,7 +408,7 @@ export function PlanningModal({
   const planToggle = async (t: Task) => {
     const next = !isPlanDone(t);
     setPlanDone((m) => new Map(m).set(t.id, next));
-    await toggleTask({ taskId: t.id }).catch(() => {});
+    await toggleTask({ taskId: t.id, today: todayISO() }).catch(() => {});
     router.refresh();
   };
   const pendDelete = async (id: string) => {

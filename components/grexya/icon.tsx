@@ -4,6 +4,7 @@ import {
   MoreVertical, MoreHorizontal, ArrowLeft, Flag, LayoutGrid, X, Eye, EyeOff,
   Clock, Zap, Sparkles, Paperclip, Send, Bold, Italic, Heading1, Quote,
   Star, AlertTriangle, Trash2, Pencil, Upload, Image as ImageIcon, GripVertical,
+  Repeat,
   type LucideIcon,
 } from "lucide-react";
 
@@ -17,6 +18,7 @@ const MAP: Record<string, LucideIcon> = {
   sparkles: Sparkles, paperclip: Paperclip, send: Send, bold: Bold,
   italic: Italic, h1: Heading1, quote: Quote, star: Star, warn: AlertTriangle,
   trash: Trash2, pencil: Pencil, upload: Upload, image: ImageIcon, grip: GripVertical,
+  repeat: Repeat,
 };
 
 export function Icon({

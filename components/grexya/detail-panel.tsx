@@ -27,11 +27,12 @@ import {
   StatusChip,
 } from "@/components/grexya/atoms";
 import { usePeople, personFor } from "@/components/grexya/people";
-import { subStats, todayISO, QUAD_META, type Quad } from "@/lib/grexya-helpers";
-import type { Front, Project, ProjectStatusColumn, Task } from "@/lib/types";
+import { subStats, todayISO, QUAD_META, RECURRENCE_META, type Quad } from "@/lib/grexya-helpers";
+import type { Front, Project, ProjectStatusColumn, Recurrence, Task } from "@/lib/types";
 
 const QUAD_OPTS: Quad[] = ["ui", "ni", "un", "nn"];
 const FRONT_OPTS: Front[] = ["business", "tech", "branding", "marketing"];
+const REC_OPTS: Recurrence[] = ["daily", "weekdays", "weekly"];
 
 function Popover({
   open,
@@ -175,6 +176,7 @@ export function DetailPanel({
   onCreateSub,
   onDeleteTask,
   onSetTop3,
+  onSetRecurrence,
   onReorderSubtasks,
 }: {
   task: Task;
@@ -187,6 +189,7 @@ export function DetailPanel({
   onCreateSub: (parentId: string, title: string) => void;
   onDeleteTask: (id: string) => void;
   onSetTop3: (taskId: string, dayDate: string, on: boolean) => Promise<{ ok: boolean; error?: string }>;
+  onSetRecurrence: (taskId: string, recurrence: Recurrence | null) => void;
   onReorderSubtasks: (parentId: string, ids: string[]) => void;
 }) {
   const ctx = usePeople();
@@ -339,6 +342,35 @@ export function DetailPanel({
                 {task.is_top3 ? "En el Top 3" : "Marcar Top 3"}
               </button>
             </PropRow>
+            <PropRow icon="repeat" label="Repetir">
+              <button
+                className="prop-btn"
+                onClick={() => setMenu(menu === "rec" ? null : "rec")}
+                style={{ gap: 7, color: task.recurrence ? "var(--text)" : "var(--text-2)" }}
+              >
+                {task.recurrence ? (
+                  <>
+                    <Icon name="repeat" size={15} />
+                    {RECURRENCE_META[task.recurrence].label}
+                  </>
+                ) : (
+                  <span className="faint">No se repite</span>
+                )}
+                <Popover open={menu === "rec"} onClose={() => setMenu(null)}>
+                  <button className="pop-item" onClick={() => { onSetRecurrence(task.id, null); setMenu(null); }}>
+                    <span className="faint">No se repite</span>
+                    {!task.recurrence && <Icon name="check" size={15} style={{ marginLeft: "auto" }} />}
+                  </button>
+                  {REC_OPTS.map((r) => (
+                    <button key={r} className="pop-item" onClick={() => { onSetRecurrence(task.id, r); setMenu(null); }}>
+                      <Icon name="repeat" size={15} />
+                      {RECURRENCE_META[r].label}
+                      {task.recurrence === r && <Icon name="check" size={15} style={{ marginLeft: "auto" }} />}
+                    </button>
+                  ))}
+                </Popover>
+              </button>
+            </PropRow>
             <PropRow icon="grid" label="Categoría">
               <button className="prop-btn" onClick={() => setMenu(menu === "cat" ? null : "cat")}>
                 {task.front ? <CategoryChip cat={task.front} /> : <span className="faint">—</span>}
@@ -379,6 +411,14 @@ export function DetailPanel({
               />
             </PropRow>
           </div>
+
+          {task.recurrence && (
+            <div className="chip" style={{ height: "auto", padding: "7px 11px", gap: 7, color: "var(--text-2)" }}>
+              <Icon name="repeat" size={14} />
+              {RECURRENCE_META[task.recurrence].hint}
+              {total > 0 && " Se copian las subtareas, sin marcar."}
+            </div>
+          )}
 
           {topMsg && (
             <div className="chip tone-amber" style={{ height: "auto", padding: "7px 11px", gap: 7 }}>

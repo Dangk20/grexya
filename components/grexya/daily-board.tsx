@@ -186,6 +186,9 @@ function DailyTask({
     >
       <Check done={isDone} onClick={() => onToggle(task.id)} size={17} />
       <span className="dtask-title">{task.title}</span>
+      {task.recurrence && (
+        <Icon name="repeat" size={13} className="faint" style={{ flexShrink: 0 }} />
+      )}
       <SubCounter task={task} all={all} />
       <StarBtn on={topOn} onClick={onStar} />
       <Avatar id={task.assignee_id} size={22} />

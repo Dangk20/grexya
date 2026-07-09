@@ -6,6 +6,8 @@ export type Priority = "alta" | "media" | "baja";
 export type Front = "business" | "tech" | "branding" | "marketing";
 export type Eisenhower = "ui" | "ni" | "un" | "nn" | "reunion";
 export type TaskStatus = "sin" | "prog" | "listo";
+/** Cadencia de una tarea recurrente: se reprograma sola al completarla. */
+export type Recurrence = "daily" | "weekdays" | "weekly";
 export type ModuleId = "hoy" | "kanban" | "lista" | "notas";
 
 export type Workspace = {
@@ -67,6 +69,8 @@ export type Task = {
   top_rank: number | null;
   meeting_time: string | null;
   notion_page_id: string | null;
+  recurrence: Recurrence | null;
+  recurrence_from_id: string | null;
   is_done: boolean;
   completed_at: string | null;
   deleted_at: string | null;

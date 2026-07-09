@@ -24,7 +24,8 @@ import { createNote, deleteNote, updateNote } from "@/app/actions/notes";
 import { disconnectCalendar } from "@/app/actions/calendar";
 import { disconnectNotion } from "@/app/actions/notion";
 import type { CalendarConn, NotionConn } from "@/lib/data";
-import type { ModuleId, Note, Planning, Project, ProjectStatusColumn, Task } from "@/lib/types";
+import { todayISO } from "@/lib/grexya-helpers";
+import type { ModuleId, Note, Planning, Project, ProjectStatusColumn, Recurrence, Task } from "@/lib/types";
 
 export function AppShell({
   projects: pProjects,
@@ -102,7 +103,13 @@ export function AppShell({
   // ---- mutaciones (optimista + acción + refresh) ----
   const toggleTask = async (id: string) => {
     setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, is_done: !t.is_done } : t)));
-    await taskActions.toggleTask({ taskId: id });
+    // `today` local: el servidor corre en UTC y adelantaría la próxima ocurrencia.
+    await taskActions.toggleTask({ taskId: id, today: todayISO() });
+    refresh();
+  };
+  const setRecurrence = async (taskId: string, recurrence: Recurrence | null) => {
+    setTasks((ts) => ts.map((t) => (t.id === taskId ? { ...t, recurrence } : t)));
+    await taskActions.setTaskRecurrence({ taskId, recurrence, today: todayISO() });
     refresh();
   };
   const moveTask = async (id: string, statusId: string | null) => {
@@ -334,6 +341,7 @@ export function AppShell({
             onCreateSub={createSub}
             onDeleteTask={deleteTask}
             onSetTop3={setTop3}
+            onSetRecurrence={setRecurrence}
             onReorderSubtasks={reorderSubtasks}
           />
         )}
