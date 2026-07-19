@@ -31,7 +31,17 @@ export function BoardsView({
   const [list] = useSyncedState<Note[]>(boards);
   const [openId, setOpenId] = useState<string | null>(null);
   const [full, setFull] = useState(false);
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
   const open = openId ? list.find((b) => b.id === openId) ?? null : null;
+
+  // cerrar el menú ⋯ al hacer clic fuera
+  useEffect(() => {
+    if (!menuId) return;
+    const close = () => setMenuId(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [menuId]);
 
   // crear → directo a la vista de trabajo, en pantalla completa
   const handleCreate = async () => {
@@ -103,18 +113,64 @@ export function BoardsView({
       ) : (
         <div className="boards-grid">
           {list.map((b) => (
-            <button key={b.id} className="board-card card" onClick={() => setOpenId(b.id)}>
+            <div
+              key={b.id}
+              className="board-card card"
+              role="button"
+              tabIndex={0}
+              onClick={() => renamingId !== b.id && setOpenId(b.id)}
+              onKeyDown={(e) => e.key === "Enter" && renamingId !== b.id && setOpenId(b.id)}
+            >
               <div className="board-cover">
                 <Icon name="shapes" size={26} />
               </div>
               <div className="board-meta">
-                <span className="board-title">{b.title || "Sin título"}</span>
+                {renamingId === b.id ? (
+                  <input
+                    className="board-rename"
+                    autoFocus
+                    defaultValue={b.title}
+                    placeholder="Nombre del board"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                      if (e.key === "Escape") setRenamingId(null);
+                    }}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v && v !== b.title) onUpdate(b.id, { title: v });
+                      setRenamingId(null);
+                    }}
+                  />
+                ) : (
+                  <span className="board-title">{b.title || "Sin título"}</span>
+                )}
                 <span className="board-upd">
                   Editado{" "}
                   {new Date(b.updated_at).toLocaleDateString("es-CO", { day: "2-digit", month: "short" })}
                 </span>
               </div>
-            </button>
+              <button
+                className="icon-btn sm board-menu-btn"
+                title="Opciones"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuId(menuId === b.id ? null : b.id);
+                }}
+              >
+                <Icon name="moreH" size={15} />
+              </button>
+              {menuId === b.id && (
+                <div className="board-menu" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => { setRenamingId(b.id); setMenuId(null); }}>
+                    <Icon name="pencil" size={14} /> Renombrar
+                  </button>
+                  <button className="danger" onClick={() => { onDelete(b.id); setMenuId(null); }}>
+                    <Icon name="trash" size={14} /> Eliminar
+                  </button>
+                </div>
+              )}
+            </div>
           ))}
           <button className="board-card board-new" onClick={handleCreate}>
             <div className="board-cover">
@@ -131,7 +187,7 @@ export function BoardsView({
   );
 }
 
-/** Título editable inline del board (guarda al perder foco). */
+/** Título editable inline del board, estilo Google Docs (clic para editar). */
 function BoardTitle({
   board,
   onUpdate,
@@ -145,8 +201,11 @@ function BoardTitle({
       className="board-title-input"
       value={title}
       placeholder="Sin título"
+      size={Math.max(title.length, 9)}
       onChange={(e) => setTitle(e.target.value)}
-      onBlur={() => title !== board.title && onUpdate(board.id, { title })}
+      onFocus={(e) => e.target.select()}
+      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+      onBlur={() => title.trim() !== board.title && onUpdate(board.id, { title: title.trim() })}
     />
   );
 }

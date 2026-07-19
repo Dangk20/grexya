@@ -646,4 +646,16 @@ input,textarea{font-family:inherit}
 .board-open .affine-host{padding:0;overflow:hidden;position:relative}
 .board-open .affine-host affine-editor-container{position:absolute;inset:0;height:auto}
 .board-open.ne-full{position:fixed;inset:0;z-index:90;border-radius:0;height:100vh;background:var(--bg)}
-.board-title-input{background:none;border:none;outline:none;font:inherit;color:var(--text-2);min-width:60px}
+/* título del board editable estilo Google Docs */
+.board-title-input{background:none;border:none;outline:none;font:inherit;font-weight:600;color:var(--text);min-width:80px;padding:3px 8px;border-radius:6px;transition:background .12s,box-shadow .12s}
+.board-title-input:hover{background:var(--hover)}
+.board-title-input:focus{background:var(--field);box-shadow:0 0 0 1.5px var(--accent,var(--brand))}
+/* menú ⋯ de cada tarjeta del pool */
+.board-card{position:relative}
+.board-menu-btn{position:absolute;top:8px;right:8px;opacity:0;background:var(--card);border:1px solid var(--line);transition:opacity .12s}
+.board-card:hover .board-menu-btn,.board-menu-btn:focus{opacity:1}
+.board-menu{position:absolute;top:38px;right:8px;z-index:30;display:flex;flex-direction:column;min-width:150px;padding:4px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:0 6px 20px var(--sh2)}
+.board-menu button{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text);text-align:left}
+.board-menu button:hover{background:var(--hover)}
+.board-menu button.danger{color:#ED3F3F}
+.board-rename{background:var(--field);border:none;border-radius:6px;font:inherit;font-weight:600;font-size:13.5px;color:var(--text);padding:3px 7px;outline:none;box-shadow:0 0 0 1.5px var(--accent,var(--brand));width:100%}
