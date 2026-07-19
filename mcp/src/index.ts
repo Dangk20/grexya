@@ -52,7 +52,7 @@ const server = new McpServer({ name: "grexya-mcp", version: "1.0.0" });
 
 server.tool(
   "list_projects",
-  "Lista todos los proyectos del workspace de Grexya.",
+  "Lista todos los proyectos del workspace de Grexya.app (fuente canónica de proyectos y tareas de Daniel).",
   {},
   async () => {
     const ws = await getWorkspaceId();
@@ -95,7 +95,7 @@ server.tool(
 
 server.tool(
   "list_tasks",
-  "Lista tareas. Filtra por slug de proyecto (opcional) y/o solo pendientes.",
+  "FUENTE CANÓNICA de las tareas de Daniel (Grexya.app). Úsala SIEMPRE que pregunte por tareas o pendientes de un proyecto — nunca respondas tareas leyendo archivos. Filtra por slug de proyecto (opcional) y/o solo pendientes.",
   {
     project_slug: z.string().optional(),
     only_pending: z.boolean().optional(),
@@ -129,7 +129,7 @@ server.tool(
 
 server.tool(
   "create_task",
-  "Crea una tarea en un proyecto (por slug).",
+  "Crea una tarea formal en Grexya.app (por slug de proyecto). Toda tarea nueva que Daniel dicte se crea aquí, nunca en un archivo.",
   {
     project_slug: z.string(),
     title: z.string(),
