@@ -8,7 +8,7 @@ export type Eisenhower = "ui" | "ni" | "un" | "nn" | "reunion";
 export type TaskStatus = "sin" | "prog" | "listo";
 /** Cadencia de una tarea recurrente: se reprograma sola al completarla. */
 export type Recurrence = "daily" | "weekdays" | "weekly";
-export type ModuleId = "hoy" | "kanban" | "lista" | "notas";
+export type ModuleId = "hoy" | "kanban" | "lista" | "notas" | "board";
 
 export type Workspace = {
   id: string;
@@ -97,6 +97,8 @@ export type Note = {
   project_id: string;
   title: string;
   body: string;
+  /** 'note' = hoja de documento; 'board' = canvas infinito (edgeless) */
+  kind: "note" | "board";
   position: number;
   created_at: string;
   updated_at: string;

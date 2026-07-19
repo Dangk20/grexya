@@ -30,6 +30,7 @@ import {
 } from "@/components/grexya/atoms";
 import { DailyBoard } from "@/components/grexya/daily-board";
 import { NotesView } from "@/components/grexya/notes-view";
+import { BoardsView } from "@/components/grexya/boards-view";
 import { ProjectIcon } from "@/components/grexya/project-icon";
 import { coverFor, projectProgress, quadOf, QUAD_RANK, subStats } from "@/lib/grexya-helpers";
 import type { ModuleId, Note, Planning, Project, ProjectStatusColumn, Task } from "@/lib/types";
@@ -63,7 +64,7 @@ export type WorldHandlers = {
   onCreateStatus: (projectId: string) => void;
   onUpdateStatus: (statusId: string, patch: { name?: string; color?: string }) => void;
   onDeleteStatus: (statusId: string) => void;
-  onCreateNote: (projectId: string) => void;
+  onCreateNote: (projectId: string, kind?: "note" | "board") => Promise<string | undefined>;
   onUpdateNote: (id: string, patch: { title?: string; body?: string }) => void;
   onDeleteNote: (id: string) => void;
 };
@@ -724,8 +725,17 @@ export function ProjectWorld({
         {mod === "notas" && (
           <NotesView
             project={project}
-            notes={notes}
+            notes={notes.filter((n) => n.kind !== "board")}
             onCreate={() => h.onCreateNote(project.id)}
+            onUpdate={h.onUpdateNote}
+            onDelete={h.onDeleteNote}
+          />
+        )}
+        {mod === "board" && (
+          <BoardsView
+            project={project}
+            boards={notes.filter((n) => n.kind === "board")}
+            onCreate={() => h.onCreateNote(project.id, "board")}
             onUpdate={h.onUpdateNote}
             onDelete={h.onDeleteNote}
           />

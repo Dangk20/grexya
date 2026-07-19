@@ -121,14 +121,22 @@ function buildDoc(note: Note): Doc {
 export default function AffineNoteEditor({
   note,
   onUpdate,
+  mode = "page",
 }: {
   note: Note;
   onUpdate: (id: string, patch: { title?: string; body?: string }) => void;
+  mode?: "page" | "edgeless";
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<AffineEditorContainer | null>(null);
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
   const initialNoteRef = useRef(note);
+
+  // cambia entre hoja (page) y board infinito (edgeless) sin remontar
+  useEffect(() => {
+    if (editorRef.current) editorRef.current.mode = mode;
+  }, [mode]);
 
   useEffect(() => {
     registerEffects();
@@ -139,13 +147,14 @@ export default function AffineNoteEditor({
     const doc = buildDoc(current);
     const editor = new AffineEditorContainer();
     editor.doc = doc;
-    editor.mode = "page";
+    editor.mode = mode;
     const themeExt = OverrideThemeExtension({
       getAppTheme: () => appTheme$,
       getEdgelessTheme: () => appTheme$,
     });
     editor.pageSpecs = [...editor.pageSpecs, themeExt];
     editor.edgelessSpecs = [...editor.edgelessSpecs, themeExt];
+    editorRef.current = editor;
     host.appendChild(editor);
 
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -164,6 +173,7 @@ export default function AffineNoteEditor({
     return () => {
       clearTimeout(timer);
       doc.spaceDoc.off("update", onDocUpdate);
+      editorRef.current = null;
       editor.remove();
     };
   }, []);

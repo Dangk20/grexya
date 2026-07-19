@@ -11,10 +11,13 @@ const MODULE_DEFS: { id: ModuleId; label: string; icon: string }[] = [
   { id: "kanban", label: "Tablero", icon: "columns" },
   { id: "lista", label: "Tareas", icon: "list" },
   { id: "notas", label: "Notas", icon: "fileText" },
+  { id: "board", label: "Board", icon: "shapes" },
 ];
 
 export function modulesFor(project: Project) {
-  const ids = project.modules?.length ? project.modules : MODULE_DEFS.map((m) => m.id);
+  const ids = project.modules?.length
+    ? [...project.modules, "board" as ModuleId] // Board disponible en todos los mundos
+    : MODULE_DEFS.map((m) => m.id);
   return MODULE_DEFS.filter((m) => ids.includes(m.id));
 }
 

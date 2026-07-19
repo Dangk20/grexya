@@ -234,9 +234,10 @@ export function AppShell({
     const n = notions.find((x) => x.project_id === pid);
     return { connected: !!n, databaseTitle: n?.database_title ?? null };
   };
-  const onCreateNote = async (projectId: string) => {
-    await createNote({ projectId });
+  const onCreateNote = async (projectId: string, kind?: "note" | "board") => {
+    const id = await createNote({ projectId, kind });
     refresh();
+    return id;
   };
   const onUpdateNote = async (id: string, patch: { title?: string; body?: string }) => {
     await updateNote({ noteId: id, ...patch });

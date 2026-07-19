@@ -34,13 +34,18 @@ async function assertNoteOwnership(userId: string, noteId: string) {
   await assertProjectOwnership(userId, note.project_id);
 }
 
-export async function createNote(input: { projectId: string }) {
+export async function createNote(input: { projectId: string; kind?: "note" | "board" }) {
   const userId = await requireUser();
   await assertProjectOwnership(userId, input.projectId);
   const supabase = createAdminSupabaseClient();
   const { data } = await supabase
     .from("notes")
-    .insert({ project_id: input.projectId, title: "Sin título", body: "" })
+    .insert({
+      project_id: input.projectId,
+      title: "Sin título",
+      body: "",
+      kind: input.kind ?? "note",
+    })
     .select("id")
     .single();
   revalidatePath("/proyectos", "layout");
