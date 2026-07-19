@@ -65,6 +65,7 @@ export type WorldHandlers = {
   onUpdateStatus: (statusId: string, patch: { name?: string; color?: string }) => void;
   onDeleteStatus: (statusId: string) => void;
   onCreateNote: (projectId: string, kind?: "note" | "board") => Promise<string | undefined>;
+  onPlan: (projectId: string) => void;
   onUpdateNote: (id: string, patch: { title?: string; body?: string; cover?: string }) => void;
   onDeleteNote: (id: string) => void;
 };
@@ -682,6 +683,10 @@ export function ProjectWorld({
             </div>
             <div className="world-vmeta">
               <AvatarStack ids={["me"]} size={30} />
+              <button className="btn btn-line" onClick={() => h.onPlan(project.id)}>
+                <Icon name="target" size={15} />
+                Planear
+              </button>
               <button className="btn btn-line">
                 <Icon name="users" size={15} />
                 Invitar

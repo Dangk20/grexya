@@ -707,3 +707,5 @@ input,textarea{font-family:inherit}
 .plan-select:hover{background:var(--hover-2)}
 .plan-select-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .plan-proj-ico{width:19px;height:19px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;overflow:hidden;background:var(--card-2)}
+/* planear desde un proyecto: sin columna de proyecto */
+.plan-modal-proj .plan-row{grid-template-columns:minmax(0,1fr) 42px 122px 132px 132px 34px}

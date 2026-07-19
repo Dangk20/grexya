@@ -29,10 +29,13 @@ const QUADS: Quad[] = ["ui", "ni", "un", "nn"];
 
 export function GlobalPlanningModal({
   projects,
+  project,
   onClose,
   onCreate,
 }: {
   projects: Project[];
+  /** Si se planea desde un proyecto: se fija por defecto y se oculta la columna. */
+  project?: Project;
   onClose: () => void;
   onCreate: (
     rows: {
@@ -79,7 +82,15 @@ export function GlobalPlanningModal({
     if (!t) return;
     setRows((rs) => [
       ...rs,
-      { key: keyRef.current++, title: t, projectId: null, quad: null, top: false, start: "", due: "" },
+      {
+        key: keyRef.current++,
+        title: t,
+        projectId: project?.id ?? null,
+        quad: null,
+        top: false,
+        start: "",
+        due: "",
+      },
     ]);
     setDraft("");
     captureRef.current?.focus();
@@ -113,11 +124,18 @@ export function GlobalPlanningModal({
 
   return (
     <div className="plan-scrim" onClick={onClose}>
-      <div className="plan-modal card" onClick={(e) => e.stopPropagation()}>
+      <div
+        className={`plan-modal card ${project ? "plan-modal-proj" : ""}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="plan-head">
           <div>
-            <h2>Planear</h2>
-            <p className="muted">Vuelca todo lo que tengas en la cabeza. Después priorizas y asignas.</p>
+            <h2>{project ? `Planear · ${project.name}` : "Planear"}</h2>
+            <p className="muted">
+              {project
+                ? "Vuelca todo lo de este proyecto. Después priorizas."
+                : "Vuelca todo lo que tengas en la cabeza. Después priorizas y asignas."}
+            </p>
           </div>
           <button className="icon-btn" onClick={onClose}>
             <Icon name="x" size={17} />
@@ -140,7 +158,7 @@ export function GlobalPlanningModal({
               <span>Tarea</span>
               <span title="Top 3 del día">Top</span>
               <span>Prioridad</span>
-              <span>Proyecto</span>
+              {!project && <span>Proyecto</span>}
               <span>Inicio</span>
               <span>Fin</span>
               <span />
@@ -182,6 +200,7 @@ export function GlobalPlanningModal({
                   {r.quad ? QUAD_META[r.quad].short : "prioridad"}
                   <Icon name="chevDown" size={12} />
                 </button>
+                {!project && (
                 <button
                   className="plan-select"
                   onClick={(e) => {
@@ -201,6 +220,7 @@ export function GlobalPlanningModal({
                   )}
                   <Icon name="chevDown" size={12} />
                 </button>
+                )}
                 <input
                   type="date"
                   className="plan-date"
@@ -229,7 +249,7 @@ export function GlobalPlanningModal({
           <span className="muted">
             {rows.length === 0
               ? "Nada aún — escribe arriba y presiona Enter."
-              : sinProyecto > 0
+              : !project && sinProyecto > 0
                 ? `${rows.length} tareas · falta asignar proyecto a ${sinProyecto}`
                 : `${rows.length} tareas listas`}
           </span>

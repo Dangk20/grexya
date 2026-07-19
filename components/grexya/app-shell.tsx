@@ -65,6 +65,8 @@ export function AppShell({
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [newProjOpen, setNewProjOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
+  /** proyecto fijado al planear desde su mundo (null = planear global) */
+  const [planProjectId, setPlanProjectId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(true);
   const [chatOpen, setChatOpen] = useState(false);
@@ -276,6 +278,10 @@ export function AppShell({
     onUpdateStatus: updateStatus,
     onDeleteStatus: deleteStatus,
     onCreateNote,
+    onPlan: (projectId: string) => {
+      setPlanProjectId(projectId);
+      setPlanOpen(true);
+    },
     onUpdateNote,
     onDeleteNote,
   };
@@ -313,7 +319,10 @@ export function AppShell({
               onToggleTask={toggleTask}
               onOpenProject={(id) => nav("project", id)}
               onNewProject={() => setNewProjOpen(true)}
-              onPlan={() => setPlanOpen(true)}
+              onPlan={() => {
+                setPlanProjectId(null);
+                setPlanOpen(true);
+              }}
               onReorderTasks={reorderTasks}
               connectedProjectIds={calendars.map((c) => c.project_id)}
             />
@@ -383,6 +392,7 @@ export function AppShell({
         {planOpen && (
           <GlobalPlanningModal
             projects={projects}
+            project={projects.find((p) => p.id === planProjectId) ?? undefined}
             onClose={() => setPlanOpen(false)}
             onCreate={async (rows) => {
               const today = new Date().toISOString().slice(0, 10);
