@@ -234,12 +234,14 @@ export function DailyBoard({
   tasks,
   calendarConn,
   plannings,
+  dailyPlanNonce,
   h,
 }: {
   project: Project;
   tasks: Task[];
   calendarConn: { connected: boolean; email: string | null };
   plannings: Planning[];
+  dailyPlanNonce?: number;
   h: WorldHandlers;
 }) {
   const [offset, setOffset] = useState(0);
@@ -248,6 +250,14 @@ export function DailyBoard({
   const [gmeetings, setGmeetings] = useState<Meeting[]>([]);
   const [meetFormOpen, setMeetFormOpen] = useState(false);
   const [planningOpen, setPlanningOpen] = useState(false);
+  // señal externa (botón Planear del header cuando el día ya fue planeado)
+  const nonceRef = useRef(dailyPlanNonce ?? 0);
+  useEffect(() => {
+    if (dailyPlanNonce === undefined || dailyPlanNonce === nonceRef.current) return;
+    nonceRef.current = dailyPlanNonce;
+    setPlanningBlocking(false);
+    setPlanningOpen(true);
+  }, [dailyPlanNonce]);
   const [planningBlocking, setPlanningBlocking] = useState(false);
   const [preview, setPreview] = useState<MeetPreview | null>(null);
   const autoRef = useRef<string | null>(null);
@@ -389,12 +399,17 @@ export function DailyBoard({
           <button
             className="btn btn-accent plan-cta"
             onClick={() => {
+              // primera planeación del día → hoja de volcado; ya planeado → daily
+              if (!dayPlanned) {
+                h.onPlan(project.id, "dump");
+                return;
+              }
               setPlanningBlocking(false);
               setPlanningOpen(true);
             }}
           >
             <Icon name="target" size={15} />
-            {canPlan ? "Iniciar planning time" : "Planning · Daily"}
+            {!dayPlanned ? "Iniciar planning time" : "Planning · Daily"}
           </button>
         </div>
       </div>

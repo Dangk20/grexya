@@ -67,6 +67,8 @@ export function AppShell({
   const [planOpen, setPlanOpen] = useState(false);
   /** proyecto fijado al planear desde su mundo (null = planear global) */
   const [planProjectId, setPlanProjectId] = useState<string | null>(null);
+  /** señal para abrir el Planning · Daily desde fuera del módulo "hoy" */
+  const [dailyPlanNonce, setDailyPlanNonce] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(true);
   const [chatOpen, setChatOpen] = useState(false);
@@ -278,9 +280,19 @@ export function AppShell({
     onUpdateStatus: updateStatus,
     onDeleteStatus: deleteStatus,
     onCreateNote,
-    onPlan: (projectId: string) => {
-      setPlanProjectId(projectId);
-      setPlanOpen(true);
+    onPlan: (projectId: string, mode?: "dump") => {
+      const today = new Date().toISOString().slice(0, 10);
+      const plannedToday = plannings.some(
+        (p) => p.project_id === projectId && p.day_date === today,
+      );
+      // sin planeación del día (o forzado) → hoja de volcado; si ya planeó → daily
+      if (mode === "dump" || !plannedToday) {
+        setPlanProjectId(projectId);
+        setPlanOpen(true);
+        return;
+      }
+      setActiveModule("hoy");
+      setDailyPlanNonce((n) => n + 1);
     },
     onUpdateNote,
     onDeleteNote,
@@ -337,6 +349,7 @@ export function AppShell({
               calendarConn={calConn(activeProject.id)}
               plannings={plannings.filter((p) => p.project_id === activeProject.id)}
               module={activeModule}
+              dailyPlanNonce={dailyPlanNonce}
               h={worldHandlers}
             />
           )}

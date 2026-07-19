@@ -65,7 +65,8 @@ export type WorldHandlers = {
   onUpdateStatus: (statusId: string, patch: { name?: string; color?: string }) => void;
   onDeleteStatus: (statusId: string) => void;
   onCreateNote: (projectId: string, kind?: "note" | "board") => Promise<string | undefined>;
-  onPlan: (projectId: string) => void;
+  /** "dump" fuerza la hoja de volcado; sin modo decide según si ya se planeó hoy */
+  onPlan: (projectId: string, mode?: "dump") => void;
   onUpdateNote: (id: string, patch: { title?: string; body?: string; cover?: string }) => void;
   onDeleteNote: (id: string) => void;
 };
@@ -648,6 +649,7 @@ export function ProjectWorld({
   calendarConn,
   plannings,
   module: mod,
+  dailyPlanNonce,
   h,
 }: {
   project: Project;
@@ -655,6 +657,7 @@ export function ProjectWorld({
   notes: Note[];
   statuses: ProjectStatusColumn[];
   calendarConn: { connected: boolean; email: string | null };
+  dailyPlanNonce?: number;
   plannings: Planning[];
   module: ModuleId;
   h: WorldHandlers;
@@ -721,7 +724,7 @@ export function ProjectWorld({
 
       <div className="world-body">
         {mod === "hoy" && (
-          <DailyBoard project={project} tasks={tasks} calendarConn={calendarConn} plannings={plannings} h={h} />
+          <DailyBoard project={project} tasks={tasks} calendarConn={calendarConn} plannings={plannings} dailyPlanNonce={dailyPlanNonce} h={h} />
         )}
         {mod === "kanban" && <Kanban project={project} tasks={tasks} statuses={statuses} h={h} />}
         {mod === "lista" && (
