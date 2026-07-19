@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { Icon } from "@/components/grexya/icon";
 import { useSyncedState } from "@/lib/use-synced-state";
 import type { Note, Project } from "@/lib/types";
+
+// Hojas AFFiNE (BlockSuite): solo en cliente — son web components sobre lit.
+const AffineNoteEditor = dynamic(() => import("./affine-note-editor"), {
+  ssr: false,
+  loading: () => <div className="ne-page" style={{ color: "var(--text-3)" }}>Cargando hoja…</div>,
+});
 
 export function NotesView({
   project,
@@ -20,10 +27,19 @@ export function NotesView({
 }) {
   const [list] = useSyncedState<Note[]>(notes);
   const [activeId, setActiveId] = useState<string | null>(notes[0]?.id ?? null);
+  const [full, setFull] = useState(false);
   const doc = list.find((d) => d.id === activeId) ?? list[0] ?? null;
 
+  // Esc sale de pantalla completa (como en Notion)
+  useEffect(() => {
+    if (!full) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setFull(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [full]);
+
   return (
-    <div className="notes">
+    <div className={`notes ${full ? "ne-full" : ""}`}>
       <div className="notes-list">
         <div className="notes-list-head">
           <span className="section-label">Documentos</span>
@@ -53,7 +69,15 @@ export function NotesView({
       </div>
 
       {doc ? (
-        <NoteEditor key={doc.id} project={project} note={doc} onUpdate={onUpdate} onDelete={onDelete} />
+        <NoteEditor
+          key={doc.id}
+          project={project}
+          note={doc}
+          onUpdate={onUpdate}
+          onDelete={onDelete}
+          full={full}
+          onToggleFull={() => setFull((f) => !f)}
+        />
       ) : (
         <div className="notes-editor card" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-3)" }}>
           Crea tu primer documento.
@@ -68,14 +92,16 @@ function NoteEditor({
   note,
   onUpdate,
   onDelete,
+  full,
+  onToggleFull,
 }: {
   project: Project;
   note: Note;
   onUpdate: (id: string, patch: { title?: string; body?: string }) => void;
   onDelete: (id: string) => void;
+  full: boolean;
+  onToggleFull: () => void;
 }) {
-  const [title, setTitle] = useState(note.title);
-  const [body, setBody] = useState(note.body);
   return (
     <div className="notes-editor card">
       <div className="ne-toolbar">
@@ -84,39 +110,22 @@ function NoteEditor({
             {project.emoji} {project.name}
           </span>
           <Icon name="chevRight" size={13} className="faint" />
-          <span className="muted">{title || "Sin título"}</span>
+          <span className="muted">{note.title || "Sin título"}</span>
         </div>
         <div className="ne-tools">
-          {["bold", "italic", "h1", "list", "quote"].map((n) => (
-            <button key={n} className="icon-btn sm">
-              <Icon name={n} size={15} />
-            </button>
-          ))}
+          <button
+            className="icon-btn sm"
+            title={full ? "Salir de pantalla completa (Esc)" : "Pantalla completa"}
+            onClick={onToggleFull}
+          >
+            <Icon name={full ? "minimize" : "maximize"} size={15} />
+          </button>
           <button className="icon-btn sm" title="Eliminar" onClick={() => onDelete(note.id)}>
             <Icon name="x" size={15} />
           </button>
         </div>
       </div>
-      <div className="ne-page">
-        <div className="ne-emoji">📄</div>
-        <input
-          className="ne-title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onBlur={() => title !== note.title && onUpdate(note.id, { title })}
-          placeholder="Sin título"
-          style={{ background: "none", border: "none", width: "100%" }}
-        />
-        <textarea
-          className="ne-p"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          onBlur={() => body !== note.body && onUpdate(note.id, { body })}
-          placeholder="Escribe aquí… (texto y Markdown)"
-          rows={18}
-          style={{ background: "none", border: "none", width: "100%", resize: "none", outline: "none" }}
-        />
-      </div>
+      <AffineNoteEditor key={note.id} note={note} onUpdate={onUpdate} />
     </div>
   );
 }
