@@ -65,7 +65,7 @@ export type WorldHandlers = {
   onUpdateStatus: (statusId: string, patch: { name?: string; color?: string }) => void;
   onDeleteStatus: (statusId: string) => void;
   onCreateNote: (projectId: string, kind?: "note" | "board") => Promise<string | undefined>;
-  onUpdateNote: (id: string, patch: { title?: string; body?: string }) => void;
+  onUpdateNote: (id: string, patch: { title?: string; body?: string; cover?: string }) => void;
   onDeleteNote: (id: string) => void;
 };
 

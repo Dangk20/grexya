@@ -118,14 +118,35 @@ function buildDoc(note: Note): Doc {
   return doc;
 }
 
+/** Miniatura JPEG (480px de ancho) del canvas edgeless para el pool de boards. */
+function captureCanvas(host: HTMLElement): string | null {
+  const canvas = host.querySelector("canvas");
+  if (!(canvas instanceof HTMLCanvasElement) || canvas.width === 0 || canvas.height === 0) return null;
+  try {
+    const w = 480;
+    const h = Math.max(1, Math.round((canvas.height / canvas.width) * w));
+    const off = document.createElement("canvas");
+    off.width = w;
+    off.height = h;
+    const ctx = off.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(canvas, 0, 0, w, h);
+    return off.toDataURL("image/jpeg", 0.6);
+  } catch {
+    return null;
+  }
+}
+
 export default function AffineNoteEditor({
   note,
   onUpdate,
   mode = "page",
+  captureCover = false,
 }: {
   note: Note;
-  onUpdate: (id: string, patch: { title?: string; body?: string }) => void;
+  onUpdate: (id: string, patch: { title?: string; body?: string; cover?: string }) => void;
   mode?: "page" | "edgeless";
+  captureCover?: boolean;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<AffineEditorContainer | null>(null);
@@ -162,7 +183,12 @@ export default function AffineNoteEditor({
       const body = AFFINE_BODY_PREFIX + bytesToBase64(Y.encodeStateAsUpdate(doc.spaceDoc));
       const root = doc.root as { title?: { toString(): string } } | null;
       const title = root?.title?.toString() ?? "";
-      onUpdateRef.current(current.id, { title, body });
+      const patch: { title?: string; body?: string; cover?: string } = { title, body };
+      if (captureCover && hostRef.current) {
+        const cover = captureCanvas(hostRef.current);
+        if (cover) patch.cover = cover;
+      }
+      onUpdateRef.current(current.id, patch);
     };
     const onDocUpdate = () => {
       clearTimeout(timer);

@@ -18,7 +18,7 @@ import {
   existsSync, mkdirSync, readdirSync, readFileSync, renameSync,
   statSync, unlinkSync, writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 
@@ -66,7 +66,26 @@ type Task = {
   is_done: boolean; updated_at: string;
 };
 type StateEntry = { path: string; fileHash: string; remoteUpdated: string };
-type State = { tasks: Record<string, StateEntry> };
+type DocEntry = { noteId: string; hash: string };
+type State = { tasks: Record<string, StateEntry>; docs?: Record<string, DocEntry> };
+
+/** Documentos .md de un proyecto (recursivo), excluyendo tasks/ y meta. */
+function walkDocs(folder: string, sub = ""): string[] {
+  const out: string[] = [];
+  const dir = join(folder, sub);
+  if (!existsSync(dir)) return out;
+  for (const d of readdirSync(dir, { withFileTypes: true })) {
+    if (d.name.startsWith(".") || d.name.startsWith("_")) continue;
+    const rel = sub ? join(sub, d.name) : d.name;
+    if (d.isDirectory()) {
+      if (["tasks", "node_modules"].includes(d.name)) continue;
+      out.push(...walkDocs(folder, rel));
+    } else if (d.name.endsWith(".md") && d.name !== "CLAUDE.md") {
+      out.push(rel);
+    }
+  }
+  return out;
+}
 
 const log = (msg: string) =>
   console.log(`${new Date().toISOString()} ${DRY ? "[dry] " : ""}${msg}`);
@@ -304,8 +323,45 @@ async function main() {
       stats.borradas++;
     }
 
+    // ── 4. Documentos: carpeta → app (una sola vía; la carpeta manda) ────
+    state.docs ??= {};
+    const dstats = { nuevos: 0, cambiados: 0, quitados: 0 };
+    const vistos = new Set<string>();
+    for (const [projectId, folder] of folderOf) {
+      for (const rel of walkDocs(folder)) {
+        const abs = join(folder, rel);
+        const content = readFileSync(abs, "utf8");
+        const h = sha(content);
+        const key = relative(PROJECTS_DIR, abs);
+        vistos.add(key);
+        const st = state.docs[key];
+        if (st && st.hash === h) continue;
+        const title =
+          content.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? rel.replace(/\.md$/, "");
+        if (!st) {
+          dstats.nuevos++;
+          if (DRY) continue;
+          const { data, error } = await sb.from("notes")
+            .insert({ project_id: projectId, title, body: content, kind: "doc" })
+            .select("id").single();
+          if (error) throw new Error(`doc ${key}: ${error.message}`);
+          state.docs[key] = { noteId: data.id, hash: h };
+        } else {
+          dstats.cambiados++;
+          if (!DRY) await sb.from("notes").update({ title, body: content }).eq("id", st.noteId);
+          state.docs[key] = { ...st, hash: h };
+        }
+      }
+    }
+    for (const [key, st] of Object.entries(state.docs)) {
+      if (vistos.has(key)) continue;
+      dstats.quitados++;
+      if (!DRY) await sb.from("notes").delete().eq("id", st.noteId);
+      delete state.docs[key];
+    }
+
     if (!DRY) writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
-    log(`ok — app+${stats.creadasApp} local+${stats.creadasLocal} ↑${stats.subidas} ↓${stats.bajadas} ✕${stats.borradas} ⚠${stats.conflictos}`);
+    log(`ok — app+${stats.creadasApp} local+${stats.creadasLocal} ↑${stats.subidas} ↓${stats.bajadas} ✕${stats.borradas} ⚠${stats.conflictos} · docs +${dstats.nuevos} ~${dstats.cambiados} ✕${dstats.quitados}`);
   } finally {
     if (!DRY && existsSync(LOCK_FILE)) unlinkSync(LOCK_FILE);
   }

@@ -517,6 +517,7 @@ export function CommandCenter({
   onToggleTask,
   onOpenProject,
   onNewProject,
+  onPlan,
   onReorderTasks,
   connectedProjectIds,
 }: {
@@ -527,6 +528,7 @@ export function CommandCenter({
   onToggleTask: (id: string) => void;
   onOpenProject: (id: string) => void;
   onNewProject: () => void;
+  onPlan: () => void;
   onReorderTasks: (projectId: string, items: { id: string; position: number }[]) => void;
   connectedProjectIds: string[];
 }) {
@@ -552,6 +554,12 @@ export function CommandCenter({
           Tienes <b>{todayCount} tareas</b> para hoy y <b>{meetCount} reuniones</b>{" "}
           agendadas en tus {projects.length} mundos.
         </p>
+        <div className="home-actions">
+          <button className="btn btn-ink" onClick={onPlan}>
+            <Icon name="target" size={15} />
+            Planear
+          </button>
+        </div>
       </header>
 
       <WorkSplitBar projects={projects} tasks={tasks} />

@@ -56,12 +56,14 @@ export async function updateNote(input: {
   noteId: string;
   title?: string;
   body?: string;
+  cover?: string;
 }) {
   const userId = await requireUser();
   await assertNoteOwnership(userId, input.noteId);
   const patch: Record<string, string> = {};
   if (input.title !== undefined) patch.title = input.title;
   if (input.body !== undefined) patch.body = input.body;
+  if (input.cover !== undefined) patch.cover = input.cover;
   if (Object.keys(patch).length === 0) return;
   const supabase = createAdminSupabaseClient();
   await supabase.from("notes").update(patch).eq("id", input.noteId);

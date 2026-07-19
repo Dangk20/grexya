@@ -93,6 +93,7 @@ export async function createTask(input: {
     .single();
   if (created) await notionSyncCreate(input.projectId, created as Task);
   revalidate();
+  return created?.id as string | undefined;
 }
 
 /** Marca/desmarca una tarea como Top 3 del día. Máximo 3 por (proyecto, día). */

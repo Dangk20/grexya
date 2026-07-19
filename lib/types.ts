@@ -97,8 +97,10 @@ export type Note = {
   project_id: string;
   title: string;
   body: string;
-  /** 'note' = hoja de documento; 'board' = canvas infinito (edgeless) */
-  kind: "note" | "board";
+  /** 'note' = hoja; 'board' = canvas infinito; 'doc' = espejo de un markdown de la carpeta (solo lectura) */
+  kind: "note" | "board" | "doc";
+  /** miniatura (data URL) del canvas — solo boards */
+  cover: string | null;
   position: number;
   created_at: string;
   updated_at: string;

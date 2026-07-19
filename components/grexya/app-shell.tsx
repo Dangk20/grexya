@@ -11,6 +11,7 @@ import { ProjectWorld, type WorldHandlers } from "@/components/grexya/project-wo
 import { DetailPanel } from "@/components/grexya/detail-panel";
 import { ChatPanel } from "@/components/grexya/chat-panel";
 import { NewProjectModal } from "@/components/grexya/new-project-modal";
+import { GlobalPlanningModal } from "@/components/grexya/global-planning-modal";
 import { ProjectSettingsModal } from "@/components/grexya/project-settings-modal";
 import { useSyncedState } from "@/lib/use-synced-state";
 import * as taskActions from "@/app/actions/tasks";
@@ -63,6 +64,7 @@ export function AppShell({
   const [activeModule, setActiveModule] = useState<ModuleId>("hoy");
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [newProjOpen, setNewProjOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(true);
   const [chatOpen, setChatOpen] = useState(false);
@@ -239,7 +241,7 @@ export function AppShell({
     refresh();
     return id;
   };
-  const onUpdateNote = async (id: string, patch: { title?: string; body?: string }) => {
+  const onUpdateNote = async (id: string, patch: { title?: string; body?: string; cover?: string }) => {
     await updateNote({ noteId: id, ...patch });
     refresh();
   };
@@ -311,6 +313,7 @@ export function AppShell({
               onToggleTask={toggleTask}
               onOpenProject={(id) => nav("project", id)}
               onNewProject={() => setNewProjOpen(true)}
+              onPlan={() => setPlanOpen(true)}
               onReorderTasks={reorderTasks}
               connectedProjectIds={calendars.map((c) => c.project_id)}
             />
@@ -376,6 +379,30 @@ export function AppShell({
           </button>
         )}
         {chatOpen && <ChatPanel project={chatProject} onClose={() => setChatOpen(false)} />}
+
+        {planOpen && (
+          <GlobalPlanningModal
+            projects={projects}
+            onClose={() => setPlanOpen(false)}
+            onCreate={async (rows) => {
+              const today = new Date().toISOString().slice(0, 10);
+              for (const r of rows) {
+                const id = await taskActions.createTask({
+                  projectId: r.projectId,
+                  title: r.title,
+                  eisenhower: r.eisenhower,
+                  start_date: r.start_date,
+                  due_date: r.due_date,
+                  dayDate: r.top ? today : null,
+                });
+                if (r.top && id) {
+                  await taskActions.setTaskTop3({ taskId: id, dayDate: today, on: true });
+                }
+              }
+              refresh();
+            }}
+          />
+        )}
 
         {toast && <UndoToast msg={toast.msg} onUndo={undoDelete} onClose={() => setToast(null)} />}
       </div>

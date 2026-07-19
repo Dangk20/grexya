@@ -53,7 +53,7 @@ export function NotesView({
             className={`note-item ${doc?.id === d.id ? "on" : ""}`}
             onClick={() => setActiveId(d.id)}
           >
-            <span className="note-ico">📄</span>
+            <span className="note-ico">{d.kind === "doc" ? "📁" : "📄"}</span>
             <span className="note-meta">
               <span className="note-title">{d.title || "Sin título"}</span>
               <span className="note-upd">
@@ -113,6 +113,12 @@ function NoteEditor({
           <span className="muted">{note.title || "Sin título"}</span>
         </div>
         <div className="ne-tools">
+          {note.kind === "doc" && (
+            <span className="chip tone-gray" title="Espejo del markdown en la carpeta del proyecto">
+              <span className="chip-dot" />
+              solo lectura · se edita en la carpeta
+            </span>
+          )}
           <button
             className="icon-btn sm"
             title={full ? "Salir de pantalla completa (Esc)" : "Pantalla completa"}
@@ -120,12 +126,21 @@ function NoteEditor({
           >
             <Icon name={full ? "minimize" : "maximize"} size={15} />
           </button>
-          <button className="icon-btn sm" title="Eliminar" onClick={() => onDelete(note.id)}>
-            <Icon name="x" size={15} />
-          </button>
+          {note.kind !== "doc" && (
+            <button className="icon-btn sm" title="Eliminar" onClick={() => onDelete(note.id)}>
+              <Icon name="x" size={15} />
+            </button>
+          )}
         </div>
       </div>
-      <AffineNoteEditor key={note.id} note={note} onUpdate={onUpdate} />
+      {note.kind === "doc" ? (
+        <div className="doc-viewer">
+          <h1>{note.title}</h1>
+          <pre>{note.body}</pre>
+        </div>
+      ) : (
+        <AffineNoteEditor key={note.id} note={note} onUpdate={onUpdate} />
+      )}
     </div>
   );
 }

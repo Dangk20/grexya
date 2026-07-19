@@ -25,7 +25,7 @@ export function BoardsView({
   project: Project;
   boards: Note[];
   onCreate: () => Promise<string | undefined>;
-  onUpdate: (id: string, patch: { title?: string; body?: string }) => void;
+  onUpdate: (id: string, patch: { title?: string; body?: string; cover?: string }) => void;
   onDelete: (id: string) => void;
 }) {
   const [list] = useSyncedState<Note[]>(boards);
@@ -90,7 +90,13 @@ export function BoardsView({
             </button>
           </div>
         </div>
-        <AffineNoteEditor key={open.id} note={open} onUpdate={(id, patch) => onUpdate(id, { body: patch.body })} mode="edgeless" />
+        <AffineNoteEditor
+          key={open.id}
+          note={open}
+          onUpdate={(id, patch) => onUpdate(id, { body: patch.body, cover: patch.cover })}
+          mode="edgeless"
+          captureCover
+        />
       </div>
     );
   }
@@ -122,7 +128,7 @@ export function BoardsView({
               onKeyDown={(e) => e.key === "Enter" && renamingId !== b.id && setOpenId(b.id)}
             >
               <div className="board-cover">
-                <Icon name="shapes" size={26} />
+                {b.cover ? <img src={b.cover} alt="" /> : <Icon name="shapes" size={26} />}
               </div>
               <div className="board-meta">
                 {renamingId === b.id ? (
