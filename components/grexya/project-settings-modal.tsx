@@ -12,7 +12,7 @@ import type { ModuleId, Project, ProjectStatusColumn, Task } from "@/lib/types";
 
 const QUADS: Quad[] = ["ui", "ni", "un", "nn"];
 
-const ACCENTS = ["#5B5BD6","#7C66DC","#E93D82","#0E9888","#B45718","#3E63DD","#2FA363","#E5484D"];
+const ACCENTS = ["#1E96EB","#6E52DF","#E660A4","#3EBFB2","#FFAF38","#4F90FF","#7CC270","#ED3F3F"];
 const TOOLS: { id: ModuleId; label: string; icon: string; desc: string }[] = [
   { id: "hoy", label: "¿Qué haré hoy?", icon: "target", desc: "Enfoque del día con matriz de prioridades" },
   { id: "kanban", label: "Tablero", icon: "columns", desc: "Tareas en columnas por estado" },
