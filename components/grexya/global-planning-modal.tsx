@@ -23,7 +23,6 @@ type DraftRow = {
   due: string;
 };
 
-const hoy = () => new Date().toISOString().slice(0, 10);
 
 const QUADS: Quad[] = ["ui", "ni", "un", "nn"];
 

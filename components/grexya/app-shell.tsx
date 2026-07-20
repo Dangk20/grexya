@@ -22,6 +22,7 @@ import {
   deleteProject as deleteProjectAction,
 } from "@/app/actions/projects";
 import { createNote, deleteNote, updateNote } from "@/app/actions/notes";
+import { markPlanned } from "@/app/actions/planning";
 import { disconnectCalendar } from "@/app/actions/calendar";
 import { disconnectNotion } from "@/app/actions/notion";
 import type { CalendarConn, NotionConn } from "@/lib/data";
@@ -281,7 +282,7 @@ export function AppShell({
     onDeleteStatus: deleteStatus,
     onCreateNote,
     onPlan: (projectId: string, mode?: "dump") => {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayISO();
       const plannedToday = plannings.some(
         (p) => p.project_id === projectId && p.day_date === today,
       );
@@ -408,7 +409,8 @@ export function AppShell({
             project={projects.find((p) => p.id === planProjectId) ?? undefined}
             onClose={() => setPlanOpen(false)}
             onCreate={async (rows) => {
-              const today = new Date().toISOString().slice(0, 10);
+              // fecha LOCAL: con UTC, de noche en Colombia el día ya saltó
+              const today = todayISO();
               for (const r of rows) {
                 const id = await taskActions.createTask({
                   projectId: r.projectId,
@@ -421,6 +423,11 @@ export function AppShell({
                 if (r.top && id) {
                   await taskActions.setTaskTop3({ taskId: id, dayDate: today, on: true });
                 }
+              }
+              // deja registrada la planeación del día en cada proyecto tocado,
+              // para que la próxima vez se abra el Planning · Daily
+              for (const pid of new Set(rows.map((r) => r.projectId))) {
+                await markPlanned(pid, today);
               }
               refresh();
             }}

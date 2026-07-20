@@ -139,3 +139,21 @@ export async function skipPlanning(projectId: string, dayDate: string): Promise<
   revalidate();
   return { ok: true };
 }
+
+/**
+ * Registra la planeación del día hecha desde la hoja de volcado ("Planear").
+ * Sin esto el día seguiría contando como no planeado y volvería a abrirse.
+ */
+export async function markPlanned(projectId: string, dayDate: string): Promise<{ ok: boolean }> {
+  const userId = await requireUser();
+  await assertProjectOwnership(userId, projectId);
+  const supabase = createAdminSupabaseClient();
+  await supabase
+    .from("project_plannings")
+    .upsert(
+      { project_id: projectId, day_date: dayDate, status: "planned" },
+      { onConflict: "project_id,day_date" },
+    );
+  revalidate();
+  return { ok: true };
+}
